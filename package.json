@@ -11,6 +11,7 @@
     "@types/lodash": "^4.14.176",
     "chart.js": "^3.6.0",
     "lodash": "^4.17.21",
+    "plotly.js": "^2.6.2",
     "vue": "^2.6.11",
     "vue-chartjs": "^3.5.1",
     "vue-chartjs-typescript": "^3.3.3",
@@ -21,6 +22,8 @@
   },
   "devDependencies": {
     "@mdi/font": "^6.4.95",
+    "@types/plotly.js": "^1.54.16",
+    "@types/plotly.js-basic-dist": "^1.54.0",
     "@typescript-eslint/eslint-plugin": "^4.18.0",
     "@typescript-eslint/parser": "^4.18.0",
     "@vue/cli-plugin-eslint": "~4.5.0",

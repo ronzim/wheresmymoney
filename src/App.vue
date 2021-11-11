@@ -38,7 +38,8 @@
       <v-container fluid>
         <!-- If using vue-router -->
         <!-- <router-view></router-view> -->
-        <bar-chart :chartdata="chartData" :options="chartOptions" />
+        <!-- <bar-chart :chartdata="chartData" :options="chartOptions" /> -->
+        <div id="test" style="height: 100%"></div>
       </v-container>
     </v-main>
 
@@ -54,7 +55,8 @@ import * as XLSX from "xlsx";
 // import "@types/lodash";
 import * as _ from "lodash";
 import categories from "./categories";
-import BarChart from "./BarChart.vue";
+// import BarChart from "./BarChart.vue";
+import * as Plotly from "plotly.js";
 
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
 
@@ -77,7 +79,7 @@ export default Vue.extend({
       }
     }
   }),
-  components: { BarChart },
+  components: {},
   methods: {
     async loadFile(target: File): Promise<void> {
       if (target) {
@@ -85,14 +87,16 @@ export default Vue.extend({
         const data = await target.arrayBuffer();
         const workbook = XLSX.read(data);
         /* convert from workbook to array of arrays */
-        const first_worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        console.log(workbook.SheetNames);
+        // const first_worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const first_worksheet = workbook.Sheets["movimentiConto"];
         const jsonData = XLSX.utils.sheet_to_json(first_worksheet, {
           // header: 1
         });
         console.log(jsonData);
 
         const totalExpenses = _.sumBy(jsonData, "Importo");
-        console.log(totalExpenses);
+        console.log("total exp", totalExpenses);
 
         let expenses: any[] = [];
 
@@ -116,23 +120,18 @@ export default Vue.extend({
         console.log(expenses);
 
         const coverage = _.sumBy(expenses, "value") / totalExpenses;
+        console.log("identified exp", _.sumBy(expenses, "value"));
         console.log("coverage:", (coverage * 100).toFixed(1), "%");
 
-        this.chartData = {
-          labels: _.map(expenses, "category"),
-          datasets: [
-            {
-              label: "value",
-              data: _.map(expenses, "category"),
-              backgroundColor: [
-                "rgba(255, 99, 132, 0.2)",
-                "rgba(54, 162, 235, 0.2)"
-              ],
-              borderColor: ["rgba(255, 99, 132, 1)", "rgba(54, 162, 235, 1)"],
-              borderWidth: 1
-            }
-          ]
-        };
+        let chartData: Plotly.BarData[] = [
+          {
+            x: expenses.map(e => e.category),
+            y: expenses.map(e => -e.value),
+            type: "bar"
+          }
+        ];
+
+        Plotly.newPlot("test", chartData);
       }
     }
   }
