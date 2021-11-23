@@ -52,10 +52,6 @@ export default [
     tags: ["anonimo", "bar tavola calda"]
   },
   {
-    name: "benzina",
-    tags: ["tamoil"]
-  },
-  {
     name: "telepass",
     tags: ["telepass"]
   },
