@@ -28,6 +28,10 @@ export default [
     tags: ["a2a", "planetel", "enel"]
   },
   {
+    name: "condominio",
+    tags: ["CONDOMINIO"]
+  },
+  {
     name: "outlet",
     tags: ["vicolungo"]
   },
@@ -80,7 +84,9 @@ export default [
       "premi assicurativi",
       "binomio",
       "old wild west",
-      "lego"
+      "lego",
+      "vineria",
+      "dispensa emilia"
     ]
   },
   {

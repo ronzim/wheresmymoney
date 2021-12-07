@@ -1,8 +1,7 @@
 <template>
   <v-app>
-    <v-navigation-drawer app>
-      <!-- -->
-    </v-navigation-drawer>
+    <!-- <v-navigation-drawer app>
+    </v-navigation-drawer> -->
 
     <v-app-bar app>
       <!-- -->
@@ -41,16 +40,22 @@
           <v-col cols="6">
             <v-card outlined>
               <v-card-title>
-                Total dentified Expenses
-                {{ -idExp }}
-                €
+                <span class="mr-2"> Total identified Expenses </span>
+                <v-divider></v-divider>
+                <span class="ml-2">
+                  {{ `${-idExp.toFixed(2)} €` }}
+                </span>
               </v-card-title>
             </v-card>
           </v-col>
           <v-col cols="6">
             <v-card outlined>
               <v-card-title>
-                Coverage {{ (coverage * 100).toFixed(2) }} %</v-card-title
+                <span class="mr-4"> Coverage </span>
+                <v-divider></v-divider>
+                <span class="ml-4"
+                  >{{ (coverage * 100).toFixed(2) }} %
+                </span></v-card-title
               >
             </v-card>
           </v-col>
@@ -68,6 +73,7 @@
         <v-row>
           <v-col>
             <v-data-table
+              v-if="this.jsonData.length > 0"
               :headers="headers"
               :items="jsonData"
               dense
@@ -91,6 +97,7 @@ import * as XLSX from "xlsx";
 // import "@types/lodash";
 import * as _ from "lodash";
 import categories from "./categories";
+import columns from "./columns";
 // import BarChart from "./BarChart.vue";
 import * as Plotly from "plotly.js";
 
@@ -109,7 +116,7 @@ export default Vue.extend({
   computed: {
     headers: function () {
       let h = Object.keys(this.jsonData[0])
-        .slice(2, -5)
+        .slice(2, -3)
         .map(d => ({
           text: d,
           value: d
@@ -134,18 +141,17 @@ export default Vue.extend({
       if (target) {
         console.log(target);
         const data = await target.arrayBuffer();
-        console.log("2", data);
         const workbook = XLSX.read(data);
-        /* convert from workbook to array of arrays */
+        // convert from workbook to array of arrays
         console.log(workbook.SheetNames);
-        // const first_worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const first_worksheet = workbook.Sheets["movimentiConto"];
+        const first_worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        // const first_worksheet = workbook.Sheets["movimentiConto"];
         const jsonData = XLSX.utils.sheet_to_json(first_worksheet, {
           // header: 1
         });
         console.log(jsonData);
 
-        const totalExpenses = _.sumBy(jsonData, "Importo");
+        const totalExpenses = _.sumBy(jsonData, columns.values);
         console.log("total exp", totalExpenses);
 
         let expenses: any[] = [];
@@ -156,7 +162,7 @@ export default Vue.extend({
           let entries = _.filter(jsonData, function (d: any) {
             // they say a simple for loop would be faster...
             let containsTags = category.tags.some(function (tag: string) {
-              return d["Causale / Descrizione"].includes(tag);
+              return d[columns.description].includes(tag);
             });
 
             // store identified
@@ -168,7 +174,7 @@ export default Vue.extend({
           });
           // sum filtered values
           let sum = _.sumBy(entries, function (d: any) {
-            return d["Importo"];
+            return d[columns.values];
           });
           expenses.push({ category: category.name, value: sum });
         });
@@ -184,6 +190,8 @@ export default Vue.extend({
 
         this.idExp = _.sumBy(expenses, "value");
         this.coverage = coverage;
+
+        expenses = _.sortBy(expenses, "value");
 
         let chartData: Plotly.BarData[] = [
           {
@@ -205,12 +213,22 @@ export default Vue.extend({
           title: "Titleee",
           barmode: "stack",
           paper_bgcolor: "rgba(0,0,0,0)",
-          plot_bgcolor: "rgba(0,0,0,0)"
+          plot_bgcolor: "rgba(0,0,0,0)",
+          font: {
+            family: "Avenir, Helvetica, Arial, sans-serif",
+            size: 14,
+            color: "#afafaf"
+          }
         };
 
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
           Plotly.newPlot("chart", chartData, layout, { responsive: true });
+
+          let graphDiv = document.getElementById("chart")!;
+          graphDiv.on("plotly_selected", function (eventData: any) {
+            console.log(eventData);
+          });
         }, 0);
       }
     }
@@ -224,6 +242,6 @@ export default Vue.extend({
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
-  color: #2c3e50;
+  color: #274eb9;
 }
 </style>
