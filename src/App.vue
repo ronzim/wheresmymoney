@@ -24,11 +24,13 @@
         :value="file"
       >
         <template v-slot:selection="{ text }">
-          <v-chip small label color="primary">
+          <v-chip small label color="secondary">
             {{ text }}
           </v-chip>
-        </template></v-file-input
-      >
+        </template>
+      </v-file-input>
+
+      <settings />
     </v-app-bar>
 
     <!-- Sizes your content based upon application components -->
@@ -79,6 +81,11 @@
               dense
               :search="search"
             >
+              <template v-slot:item.identified="{ item }">
+                <span :class="`${getColor(item.identified)}--text`">{{
+                  item.identified
+                }}</span>
+              </template>
             </v-data-table>
           </v-col>
         </v-row>
@@ -101,6 +108,8 @@ import columns from "./columns";
 // import BarChart from "./BarChart.vue";
 import * as Plotly from "plotly.js";
 
+import Settings from "@/components/Settings.vue";
+
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
 
 export default Vue.extend({
@@ -112,16 +121,17 @@ export default Vue.extend({
     jsonData: [] as any[],
     search: "" as string
   }),
-  components: {},
+  components: { Settings },
   computed: {
     headers: function () {
       let h = Object.keys(this.jsonData[0])
         .slice(2, -3)
         .map(d => ({
           text: d,
-          value: d
+          value: d,
+          width: "5"
         }));
-      h.push({ text: "identified", value: "identified" });
+      h.push({ text: "Categoria", value: "identified", width: "20" });
       return h;
     }
   },
@@ -138,6 +148,7 @@ export default Vue.extend({
   },
   methods: {
     async loadFile(target: File): Promise<void> {
+      console.log("loadfile");
       if (target) {
         console.log(target);
         const data = await target.arrayBuffer();
@@ -199,7 +210,7 @@ export default Vue.extend({
             y: expenses.map(e => -e.value),
             type: "bar",
             marker: {
-              color: "rgb(158,202,225)",
+              color: expenses.map(e => this.getColor(e.category)),
               opacity: 0.6,
               line: {
                 color: "rgb(255,255,255)",
@@ -231,6 +242,11 @@ export default Vue.extend({
           });
         }, 0);
       }
+    },
+    getColor: (categoryName: string) => {
+      let categoryObj = categories.filter(c => c.name == categoryName).pop();
+      console.log("ca", categoryObj);
+      return categoryObj ? categoryObj.color : "white";
     }
   }
 });

@@ -1,79 +1,98 @@
 export default [
   {
     name: "tasse/inps",
-    tags: ["f24"]
+    tags: ["f24"],
+    color: "red"
   },
   {
     name: "mutuo",
-    tags: ["mutuo"]
+    tags: ["mutuo"],
+    color: "pink"
   },
   {
     name: "versamento dv",
-    tags: ["d/vision"]
+    tags: ["d/vision"],
+    color: "red"
   },
   {
     name: "prelievi",
-    tags: ["prel."]
+    tags: ["prel."],
+    color: "green"
   },
   {
     name: "giardiniere",
-    tags: ["CENTRO VERDE"]
+    tags: ["CENTRO VERDE"],
+    color: "red"
   },
   {
     name: "spesa",
-    tags: ["iper", "coop"]
+    tags: ["iper", "coop"],
+    color: "pink"
   },
   {
     name: "bollette",
-    tags: ["a2a", "planetel", "enel"]
+    tags: ["a2a", "planetel", "enel"],
+    color: "pink"
   },
   {
     name: "condominio",
-    tags: ["CONDOMINIO"]
+    tags: ["CONDOMINIO"],
+    color: "pink"
   },
   {
     name: "outlet",
-    tags: ["vicolungo"]
+    tags: ["vicolungo"],
+    color: "red"
   },
   {
     name: "carta prepagata",
-    tags: ["ricarica carta"]
+    tags: ["ricarica carta"],
+    color: "green"
   },
   {
     name: "pcs",
-    tags: ["MANUELE RONZONI"]
+    tags: ["MANUELE RONZONI"],
+    color: "yellow"
   },
   {
     name: "assegno",
-    tags: ["assegno"]
+    tags: ["assegno"],
+    color: "white"
   },
   {
     name: "auto",
-    tags: ["ASSICURAZIONI", "regione lombardia"]
+    tags: ["ASSICURAZIONI", "regione lombardia"],
+    color: "blue"
   },
   {
     name: "pranzi",
-    tags: ["anonimo", "bar tavola calda"]
+    tags: ["anonimo", "bar tavola calda"],
+    color: "purple"
   },
   {
     name: "telepass",
-    tags: ["telepass"]
+    tags: ["telepass"],
+    color: "blue"
   },
   {
     name: "carta credito",
-    tags: ["nexi"]
+    tags: ["nexi"],
+    color: "green"
   },
   {
     name: "pranzi",
-    tags: ["anonimo", "bar tavola calda"]
+    tags: ["anonimo", "bar tavola calda"],
+    color: "cyan"
   },
   {
     name: "benzina",
-    tags: ["tamoil", "petrol", "invernizzi roberto"]
+    tags: ["tamoil", "petrol", "invernizzi roberto"],
+    color: "#0000ff"
   },
   {
     name: "anticipo auto",
-    tags: ["BONALDI", "bonaldi"]
+    tags: ["BONALDI", "bonaldi"],
+    color: "blue"
   },
   {
     name: "varie",
@@ -87,7 +106,8 @@ export default [
       "lego",
       "vineria",
       "dispensa emilia"
-    ]
+    ],
+    color: "red"
   },
   {
     name: "palermo",
@@ -97,6 +117,7 @@ export default [
       "ristocibvs",
       "chiostro di monreale",
       "fondazione federico"
-    ]
+    ],
+    color: "red"
   }
 ];
