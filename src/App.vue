@@ -43,7 +43,7 @@
             <v-card outlined>
               <v-card-title>
                 <span class="mr-2"> Total identified Expenses </span>
-                <v-divider></v-divider>
+                <v-spacer></v-spacer>
                 <span class="ml-2">
                   {{ `${-idExp.toFixed(2)} €` }}
                 </span>
@@ -54,7 +54,7 @@
             <v-card outlined>
               <v-card-title>
                 <span class="mr-4"> Coverage </span>
-                <v-divider></v-divider>
+                <v-spacer></v-spacer>
                 <span class="ml-4"
                   >{{ (coverage * 100).toFixed(2) }} %
                 </span></v-card-title

@@ -8,59 +8,57 @@
       </template>
       <v-card>
         <v-card-title>
-          <span class="text-h5">Categories</span>
+          <span class="text-h5 secondary--text">Categories</span>
+          <v-spacer></v-spacer>
+          <v-btn color="secondary" icon outlined @click="addRow">
+            <v-icon color="secondary">mdi-plus</v-icon>
+          </v-btn>
         </v-card-title>
         <v-card-text>
-          <v-container>
-            <v-row>
-              <v-col cols="12">
-                <v-data-table :headers="headers" :items="categories">
-                  <template v-slot:item.name="props">
-                    <v-edit-dialog
-                      :return-value.sync="props.item.name"
-                      @save="log"
-                      @cancel="log"
-                      @open="log"
-                      @close="log"
-                    >
-                      {{ props.item.name }}
-                      <template v-slot:input>
-                        <v-text-field
-                          v-model="props.item.name"
-                          label="Edit"
-                          single-line
-                          counter
-                        ></v-text-field>
-                      </template>
-                    </v-edit-dialog>
-                  </template>
-                  <template v-slot:item.tags="props">
-                    <v-edit-dialog
-                      :return-value.sync="props.item.tags"
-                      large
-                      persistent
-                      @save="log"
-                      @cancel="log"
-                      @open="log"
-                      @close="log"
-                    >
-                      <div>{{ props.item.tags }}</div>
-                      <template v-slot:input>
-                        <div class="mt-4 text-h6">Update Tags</div>
-                        <v-text-field
-                          v-model="props.item.tags"
-                          label="Edit"
-                          single-line
-                          counter
-                          autofocus
-                        ></v-text-field>
-                      </template>
-                    </v-edit-dialog>
-                  </template>
-                </v-data-table>
-              </v-col>
-            </v-row>
-          </v-container>
+          <v-data-table :headers="headers" :items="categories" dense>
+            <template v-slot:item.name="props">
+              <v-edit-dialog
+                :return-value.sync="props.item.name"
+                @save="log"
+                @cancel="log"
+                @open="log"
+                @close="log"
+              >
+                {{ props.item.name.toUpperCase() }}
+                <template v-slot:input>
+                  <v-text-field
+                    v-model="props.item.name"
+                    label="Edit"
+                    single-line
+                    counter
+                  ></v-text-field>
+                </template>
+              </v-edit-dialog>
+            </template>
+            <template v-slot:item.tags="props">
+              <v-edit-dialog
+                :return-value.sync="props.item.tags"
+                persistent
+                @save="log"
+                @cancel="log"
+                @open="log"
+                @close="log"
+              >
+                <v-chip small v-for="tag in props.item.tags" :key="tag">
+                  {{ tag }}
+                </v-chip>
+                <template v-slot:input>
+                  <v-text-field
+                    v-model="props.item.tags"
+                    label="Edit"
+                    single-line
+                    counter
+                    autofocus
+                  ></v-text-field>
+                </template>
+              </v-edit-dialog>
+            </template>
+          </v-data-table>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -94,6 +92,13 @@ export default Vue.extend({
   methods: {
     log: (somethingToSay: string) => {
       console.log(somethingToSay);
+    },
+    addRow: () => {
+      categories.unshift({
+        name: "",
+        tags: [],
+        color: "#000000"
+      });
     }
   }
 });
