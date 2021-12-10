@@ -26,17 +26,19 @@
           </v-file-input>
 
           <v-select
+            v-model="descCol"
             dense
             class="mx-2"
-            :items="letters"
+            :items="columns"
             label="Descr. column"
             prepend-icon="mdi-text"
             outlined
           ></v-select>
           <v-select
+            v-model="valueCol"
             dense
             class="mx-2"
-            :items="letters"
+            :items="columns"
             label="Value column"
             prepend-icon="mdi-cash-multiple"
             outlined
@@ -71,7 +73,7 @@
             </template>
           </v-file-input>
 
-          <span class="mb-2"> OR </span>
+          <div>OR</div>
 
           <settings />
         </v-card>
@@ -169,6 +171,8 @@ import { Category } from "@/types";
 export default Vue.extend({
   name: "App",
   data: () => ({
+    valueCol: "" as string,
+    descCol: "" as string,
     idExp: 0 as number,
     coverage: 0 as number,
     file: [] as File[],
@@ -177,7 +181,7 @@ export default Vue.extend({
     search: "" as string,
     categories: [] as Category[],
     expenses: [] as any[],
-    letters: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "L", "M"],
+    columns: [] as string[],
     panel: true as boolean
   }),
   components: { Settings },
@@ -217,6 +221,9 @@ export default Vue.extend({
         });
         this.jsonData = jsonData;
         console.log("jsonData", this.jsonData);
+        this.columns = jsonData[0]
+          ? Object.keys(jsonData[0] as Record<string, unknown>)
+          : [];
 
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
@@ -239,7 +246,8 @@ export default Vue.extend({
     computeAndRender: function () {
       const { expenses, idExp, coverage } = parseExcel(
         this.jsonData,
-        this.categories
+        this.categories,
+        { description: this.descCol, values: this.valueCol }
       );
 
       this.idExp = idExp;

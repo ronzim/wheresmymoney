@@ -1,7 +1,13 @@
 <template>
   <v-dialog v-model="dialog" persistent max-width="600px">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn color="secondary" v-bind="attrs" v-on="on" outlined class="pa-2">
+      <v-btn
+        color="secondary"
+        v-bind="attrs"
+        v-on="on"
+        outlined
+        class="mt-6 mb-2 pa-0"
+      >
         create categories
         <v-icon class="ml-2">mdi-chart-bar</v-icon>
       </v-btn>
@@ -119,13 +125,14 @@
 
 <script lang="ts">
 import Vue from "vue";
-import categories from "@/categories";
+// import categories from "@/categories";
+import { Category } from "@/types";
 
 export default Vue.extend({
   name: "App",
   data: () => ({
     dialog: false,
-    categories: categories,
+    categories: [] as Category[],
     swatches: [
       ["#FF0000", "#AA0000", "#550000"],
       ["#FFFF00", "#AAAA00", "#555500"],
@@ -136,7 +143,7 @@ export default Vue.extend({
   }),
   computed: {
     headers: function () {
-      return Object.keys(this.categories[0]).map(c => ({
+      return ["name", "tags", "color"].map(c => ({
         text: c,
         value: c,
         align: "start"
@@ -147,8 +154,8 @@ export default Vue.extend({
     log: (somethingToSay: string) => {
       console.log(somethingToSay);
     },
-    addRow: () => {
-      categories.unshift({
+    addRow: function () {
+      this.categories.unshift({
         name: "",
         tags: [],
         color: "#000000"
