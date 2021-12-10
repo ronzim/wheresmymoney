@@ -4,16 +4,14 @@
     </v-navigation-drawer> -->
 
     <v-app-bar app>
-      <!-- -->
-      <div>
+      <!-- <div>
         <router-link to="/">Home</router-link> |
         <router-link to="/about">About</router-link>
-      </div>
-      <v-spacer></v-spacer>
+      </div> -->
       <v-file-input
         class="mt-6"
         accept=".xls, .xlsx, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        label="File input"
+        label="Source file"
         prepend-icon="mdi-microsoft-excel"
         outlined
         dense
@@ -29,10 +27,28 @@
           </v-chip>
         </template>
       </v-file-input>
+
+      <v-select
+        dense
+        style="width: 100px"
+        class="mt-6 ml-2"
+        :items="letters"
+        label="Descr. column"
+        outlined
+      ></v-select>
+      <v-select
+        style="width: 100px"
+        dense
+        class="mt-6 ml-2"
+        :items="letters"
+        label="Descr. column"
+        outlined
+      ></v-select>
+
       <v-file-input
-        class="mt-6 ml-6"
+        class="mt-6 mr-4 ml-4"
         accept=".json"
-        label="File input"
+        label="Categories config file"
         prepend-icon="mdi-code-json"
         outlined
         dense
@@ -141,7 +157,8 @@ export default Vue.extend({
     jsonData: [] as any[],
     search: "" as string,
     categories: [] as Category[],
-    expenses: [] as any[]
+    expenses: [] as any[],
+    letters: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "L", "M"]
   }),
   components: { Settings },
   computed: {
