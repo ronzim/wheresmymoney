@@ -1,8 +1,9 @@
 <template>
   <v-dialog v-model="dialog" persistent max-width="600px">
     <template v-slot:activator="{ on, attrs }">
-      <v-btn color="secondary" v-bind="attrs" v-on="on" icon outlined>
-        <v-icon>mdi-cog</v-icon>
+      <v-btn color="secondary" v-bind="attrs" v-on="on" outlined class="pa-2">
+        create categories
+        <v-icon class="ml-2">mdi-chart-bar</v-icon>
       </v-btn>
     </template>
     <v-card>

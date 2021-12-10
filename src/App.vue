@@ -1,71 +1,88 @@
 <template>
   <v-app>
-    <!-- <v-navigation-drawer app>
-    </v-navigation-drawer> -->
+    <v-navigation-drawer app v-model="panel" clipped mobile-breakpoint="xs">
+      <div style="border: 1px solid grey; border-radius: 6px" class="ma-2">
+        <v-card rounded outlined color="#363636">
+          <v-card-title>Source data</v-card-title>
 
-    <v-app-bar app>
-      <!-- <div>
+          <v-file-input
+            class="mx-2 mt-2"
+            accept=".xls, .xlsx, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="Load source file"
+            prepend-icon="mdi-microsoft-excel"
+            outlined
+            dense
+            dark
+            color="secondary"
+            height="40px"
+            @change="loadFile"
+            :value="file"
+          >
+            <template v-slot:selection="{ text }">
+              <v-chip small label color="secondary">
+                {{ text }}
+              </v-chip>
+            </template>
+          </v-file-input>
+
+          <v-select
+            dense
+            class="mx-2"
+            :items="letters"
+            label="Descr. column"
+            prepend-icon="mdi-text"
+            outlined
+          ></v-select>
+          <v-select
+            dense
+            class="mx-2"
+            :items="letters"
+            label="Value column"
+            prepend-icon="mdi-cash-multiple"
+            outlined
+          ></v-select>
+        </v-card>
+      </div>
+
+      <div
+        v-if="jsonData.length > 0"
+        style="border: 1px solid grey; border-radius: 6px"
+        class="ma-2"
+      >
+        <v-card rounded outlined color="#363636">
+          <v-card-title>Categories</v-card-title>
+          <v-file-input
+            class="mx-2"
+            accept=".json"
+            label="Load categories"
+            prepend-icon="mdi-code-json"
+            outlined
+            dense
+            dark
+            color="secondary"
+            height="40px"
+            @change="loadJson"
+            :value="jsonFile"
+          >
+            <template v-slot:selection="{ text }">
+              <v-chip small label color="secondary">
+                {{ text }}
+              </v-chip>
+            </template>
+          </v-file-input>
+
+          <span class="mb-2"> OR </span>
+
+          <settings />
+        </v-card>
+      </div>
+    </v-navigation-drawer>
+
+    <v-app-bar app clipped-left>
+      <div>
         <router-link to="/">Home</router-link> |
         <router-link to="/about">About</router-link>
-      </div> -->
-      <v-file-input
-        class="mt-6"
-        accept=".xls, .xlsx, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        label="Source file"
-        prepend-icon="mdi-microsoft-excel"
-        outlined
-        dense
-        dark
-        color="secondary"
-        height="40px"
-        @change="loadFile"
-        :value="file"
-      >
-        <template v-slot:selection="{ text }">
-          <v-chip small label color="secondary">
-            {{ text }}
-          </v-chip>
-        </template>
-      </v-file-input>
-
-      <v-select
-        dense
-        style="width: 100px"
-        class="mt-6 ml-2"
-        :items="letters"
-        label="Descr. column"
-        outlined
-      ></v-select>
-      <v-select
-        style="width: 100px"
-        dense
-        class="mt-6 ml-2"
-        :items="letters"
-        label="Descr. column"
-        outlined
-      ></v-select>
-
-      <v-file-input
-        class="mt-6 mr-4 ml-4"
-        accept=".json"
-        label="Categories config file"
-        prepend-icon="mdi-code-json"
-        outlined
-        dense
-        dark
-        color="secondary"
-        height="40px"
-        @change="loadJson"
-        :value="jsonFile"
-      >
-        <template v-slot:selection="{ text }">
-          <v-chip small label color="secondary">
-            {{ text }}
-          </v-chip>
-        </template>
-      </v-file-input>
-
-      <settings />
+      </div>
     </v-app-bar>
 
     <!-- Sizes your content based upon application components -->
@@ -127,7 +144,9 @@
     </v-main>
 
     <v-footer app>
-      <!-- -->
+      <v-btn @click="panel = !panel" depressed outlined color="secondary">
+        <v-icon>{{ `mdi-arrow-${panel ? "left" : "right"}` }}</v-icon>
+      </v-btn>
     </v-footer>
   </v-app>
 </template>
@@ -158,7 +177,8 @@ export default Vue.extend({
     search: "" as string,
     categories: [] as Category[],
     expenses: [] as any[],
-    letters: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "L", "M"]
+    letters: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "L", "M"],
+    panel: true as boolean
   }),
   components: { Settings },
   computed: {
