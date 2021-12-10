@@ -166,6 +166,33 @@ import Settings from "@/components/Settings.vue";
 
 import { Category } from "@/types";
 
+function ExcelDateToJSDate(serialStr: string) {
+  let serial = parseInt(serialStr);
+  var utc_days = Math.floor(serial - 25569);
+  var utc_value = utc_days * 86400;
+  var date_info = new Date(utc_value * 1000);
+
+  var fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+  var total_seconds = Math.floor(86400 * fractional_day);
+
+  var seconds = total_seconds % 60;
+
+  total_seconds -= seconds;
+
+  var hours = Math.floor(total_seconds / (60 * 60));
+  var minutes = Math.floor(total_seconds / 60) % 60;
+
+  return new Date(
+    date_info.getFullYear(),
+    date_info.getMonth(),
+    date_info.getDate(),
+    hours,
+    minutes,
+    seconds
+  );
+}
+
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
 
 export default Vue.extend({
@@ -187,13 +214,11 @@ export default Vue.extend({
   components: { Settings },
   computed: {
     headers: function () {
-      let h = Object.keys(this.jsonData[0])
-        .slice(2, -2)
-        .map(d => ({
-          text: d,
-          value: d,
-          width: "5"
-        }));
+      let h = Object.keys(this.jsonData[0]).map(d => ({
+        text: d,
+        value: d,
+        width: "5"
+      }));
       h.push({ text: "Categoria", value: "identified", width: "20" });
       return h;
     }
@@ -211,7 +236,7 @@ export default Vue.extend({
     async loadFile(target: File): Promise<void> {
       if (target) {
         const data = await target.arrayBuffer();
-        const workbook = XLSX.read(data);
+        const workbook = XLSX.read(data, { cellDates: true });
         // convert from workbook to array of arrays
         console.log(workbook.SheetNames);
         const first_worksheet = workbook.Sheets[workbook.SheetNames[0]];
