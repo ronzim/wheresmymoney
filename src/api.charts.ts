@@ -9,6 +9,9 @@ export function parseExcel(
   columns: { description: string; values: string }
 ) {
   let expenses: any[] = [];
+  // remove "positive" data
+  // jsonData = jsonData.filter((d: any) => d[columns.values] < 0);
+
   const totalExpenses = _.sumBy(jsonData, columns.values);
 
   // Sum for each category
@@ -35,7 +38,8 @@ export function parseExcel(
     expenses.push({ category: category.name, value: sum });
   });
 
-  console.log(expenses);
+  expenses.forEach(e => console.log(e));
+  // console.log(expenses);
 
   const coverage = _.sumBy(expenses, "value") / totalExpenses;
   console.log("identified exp", _.sumBy(expenses, "value"));

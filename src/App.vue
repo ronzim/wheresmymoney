@@ -81,10 +81,26 @@
     </v-navigation-drawer>
 
     <v-app-bar app clipped-left>
-      <div>
+      <v-btn @click="panel = !panel" depressed outlined color="secondary">
+        <v-icon>{{ `mdi-arrow-${panel ? "left" : "right"}` }}</v-icon>
+      </v-btn>
+      <!-- <div>
         <router-link to="/">Home</router-link> |
         <router-link to="/about">About</router-link>
-      </div>
+      </div> -->
+      <v-spacer></v-spacer>
+      <v-alert
+        class="ma-4"
+        dense
+        type="info"
+        border="left"
+        elevation="0"
+        text
+        color="primary"
+      >
+        {{ message }}
+      </v-alert>
+      <v-spacer></v-spacer>
     </v-app-bar>
 
     <!-- Sizes your content based upon application components -->
@@ -92,30 +108,10 @@
       <!-- Provides the application the proper gutter -->
       <!-- <router-view></router-view> -->
       <v-container fluid>
-        <v-row>
-          <v-col cols="6">
-            <v-card outlined>
-              <v-card-title>
-                <span class="mr-2"> Total identified Expenses </span>
-                <v-spacer></v-spacer>
-                <span class="ml-2">
-                  {{ `${-idExp.toFixed(2)} €` }}
-                </span>
-              </v-card-title>
-            </v-card>
-          </v-col>
-          <v-col cols="6">
-            <v-card outlined>
-              <v-card-title>
-                <span class="mr-4"> Coverage </span>
-                <v-spacer></v-spacer>
-                <span class="ml-4"
-                  >{{ (coverage * 100).toFixed(2) }} %
-                </span></v-card-title
-              >
-            </v-card>
-          </v-col>
-        </v-row>
+        <!-- <v-row>
+          <v-col cols="6"> // placeholder </v-col>
+          <v-col cols="6"> // placeholder </v-col>
+        </v-row> -->
         <v-row>
           <v-col>
             <v-card>
@@ -146,9 +142,25 @@
     </v-main>
 
     <v-footer app>
-      <v-btn @click="panel = !panel" depressed outlined color="secondary">
-        <v-icon>{{ `mdi-arrow-${panel ? "left" : "right"}` }}</v-icon>
-      </v-btn>
+      <v-spacer></v-spacer>
+      <v-card outlined>
+        <v-card-title class="pa-2">
+          <span class="mr-2"> Total identified Expenses </span>
+          <v-spacer></v-spacer>
+          <span class="ml-2">
+            {{ `${-idExp.toFixed(2)} €` }}
+          </span>
+        </v-card-title>
+      </v-card>
+      <v-card outlined class="ml-4">
+        <v-card-title class="pa-2">
+          <span class="mr-4"> Coverage </span>
+          <v-spacer></v-spacer>
+          <span class="ml-4"
+            >{{ (coverage * 100).toFixed(2) }} %
+          </span></v-card-title
+        >
+      </v-card>
     </v-footer>
   </v-app>
 </template>
@@ -209,7 +221,8 @@ export default Vue.extend({
     categories: [] as Category[],
     expenses: [] as any[],
     columns: [] as string[],
-    panel: true as boolean
+    panel: true as boolean,
+    message: "Please load an expense file" as string
   }),
   components: { Settings },
   computed: {
@@ -225,8 +238,10 @@ export default Vue.extend({
   },
   mounted() {
     // dev
-    // console.log("DEV file");
-    // fetch("conto2021.xlsx").then(res => {
+    // console.warn("DEV file");
+    // fetch(
+    //   "/mnt/c/Users/Mattia-DVLab/Desktop/conti2021/movimentiConto2021.xls"
+    // ).then(res => {
     //   res.arrayBuffer().then(content => {
     //     this.loadFile(new File([content], "ciccio"));
     //   });
@@ -252,7 +267,7 @@ export default Vue.extend({
 
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
-          console.log(this.categories);
+          console.log("cat", this.categories);
           if (this.categories.length > 0) {
             this.computeAndRender();
           }
