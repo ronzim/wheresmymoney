@@ -43,6 +43,10 @@
             prepend-icon="mdi-cash-multiple"
             outlined
           ></v-select>
+          <v-switch
+            v-model="filterPositiveData"
+            :label="`Only expenses ${filterPositiveData.toString()}`"
+          ></v-switch>
         </v-card>
       </div>
 
@@ -92,13 +96,12 @@
       <v-alert
         class="ma-4"
         dense
-        type="info"
+        :type="message.type"
         border="left"
         elevation="0"
         text
-        color="primary"
       >
-        {{ message }}
+        {{ message.content }}
       </v-alert>
       <v-spacer></v-spacer>
     </v-app-bar>
@@ -172,11 +175,16 @@ import * as XLSX from "xlsx";
 import * as _ from "lodash";
 // import categories from "@/categories";
 // import BarChart from "./BarChart.vue";
-import { drawChart, parseExcel } from "@/api.charts";
+import {
+  drawChart,
+  drawLineChart,
+  prepareBarData,
+  prepareLineData
+} from "@/api.charts";
 
 import Settings from "@/components/Settings.vue";
 
-import { Category } from "@/types";
+import { Category, Message } from "@/types";
 
 function ExcelDateToJSDate(serialStr: string) {
   let serial = parseInt(serialStr);
@@ -210,6 +218,7 @@ function ExcelDateToJSDate(serialStr: string) {
 export default Vue.extend({
   name: "App",
   data: () => ({
+    filterPositiveData: true as boolean,
     valueCol: "" as string,
     descCol: "" as string,
     idExp: 0 as number,
@@ -222,7 +231,7 @@ export default Vue.extend({
     expenses: [] as any[],
     columns: [] as string[],
     panel: true as boolean,
-    message: "Please load an expense file" as string
+    message: { type: "info", content: "Please load an expense file" } as Message
   }),
   components: { Settings },
   computed: {
@@ -265,11 +274,19 @@ export default Vue.extend({
           ? Object.keys(jsonData[0] as Record<string, unknown>)
           : [];
 
+        this.message.type = "success";
+        this.message.content = "Successfully loaded expense file";
+
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
           console.log("cat", this.categories);
           if (this.categories.length > 0) {
             this.computeAndRender();
+          } else {
+            setTimeout(() => {
+              this.message.type = "info";
+              this.message.content = "Please load a category file";
+            }, 1000);
           }
         }, 0);
       }
@@ -279,22 +296,25 @@ export default Vue.extend({
       const json = JSON.parse(new TextDecoder().decode(data));
       this.categories = json;
       console.log(this.jsonData);
+      this.message.type = "success";
+      this.message.content = "Successfully loaded category file";
       if (this.jsonData.length > 0) {
         this.computeAndRender();
       }
     },
     computeAndRender: function () {
-      const { expenses, idExp, coverage } = parseExcel(
+      const { expenses, idExp, coverage } = prepareLineData(
         this.jsonData,
         this.categories,
-        { description: this.descCol, values: this.valueCol }
+        { description: this.descCol, values: this.valueCol },
+        this.filterPositiveData
       );
 
       this.idExp = idExp;
       this.coverage = coverage;
       this.expenses = expenses;
       setTimeout(() => {
-        drawChart(this.expenses, this.getColor);
+        drawLineChart(this.expenses, this.getColor);
       }, 0);
     },
     getColor: function (categoryName: string) {
