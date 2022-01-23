@@ -85,13 +85,10 @@
     </v-navigation-drawer>
 
     <v-app-bar app clipped-left>
-      <v-btn @click="panel = !panel" depressed outlined color="secondary">
+      <v-btn @click="panel = !panel" depressed>
         <v-icon>{{ `mdi-arrow-${panel ? "left" : "right"}` }}</v-icon>
       </v-btn>
-      <!-- <div>
-        <router-link to="/">Home</router-link> |
-        <router-link to="/about">About</router-link>
-      </div> -->
+
       <v-spacer></v-spacer>
       <v-alert
         class="ma-4"
@@ -104,17 +101,38 @@
         {{ message.content }}
       </v-alert>
       <v-spacer></v-spacer>
+      <v-btn-toggle v-model="view" mandatory>
+        <v-btn to="/">
+          <v-icon class="mr-2">mdi-table</v-icon>
+          Table
+        </v-btn>
+        <v-btn to="/chart">
+          <v-icon class="mr-2">mdi-poll</v-icon>
+          Chart
+        </v-btn>
+        <!-- <v-btn>
+          <v-icon>mdi-format-align-right</v-icon>
+        </v-btn>
+        <v-btn>
+          <v-icon>mdi-format-align-justify</v-icon>
+        </v-btn> -->
+      </v-btn-toggle>
     </v-app-bar>
 
     <!-- Sizes your content based upon application components -->
     <v-main>
       <!-- Provides the application the proper gutter -->
-      <!-- <router-view></router-view> -->
-      <Table
+      <router-view
+        :jsonData="jsonData"
+        :expenses="expenses"
+        :categories="categories"
+        :getColorFn="getColor"
+      ></router-view>
+      <!-- <Table
         :jsonData="jsonData"
         :categories="categories"
         :getColorFn="getColor"
-      />
+      /> -->
     </v-main>
 
     <v-footer app>
@@ -156,7 +174,7 @@ import {
   prepareLineData
 } from "@/api.charts";
 
-import Table from "@/views/Table.vue";
+// import Table from "@/views/Table.vue";
 import Settings from "@/components/Settings.vue";
 
 import { Category, Message } from "@/types";
@@ -173,13 +191,12 @@ export default Vue.extend({
     coverage: 0 as number,
     file: [] as File[],
     jsonFile: [] as File[],
-    // jsonData: [] as any[],
-    // categories: [] as Category[],
     expenses: [] as any[],
     columns: [] as string[],
-    panel: true as boolean
+    panel: true as boolean,
+    view: 0
   }),
-  components: { Table, Settings },
+  components: { Settings },
   computed: {
     ...mapState(["message"]),
     jsonData: {
@@ -267,9 +284,9 @@ export default Vue.extend({
       this.idExp = idExp;
       this.coverage = coverage;
       this.expenses = expenses;
-      setTimeout(() => {
-        drawLineChart(this.expenses, this.getColor);
-      }, 0);
+
+      // change view
+      this.$router.push("chart");
     },
     getColor: function (categoryName: string) {
       let categoryObj = this.categories

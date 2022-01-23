@@ -6,15 +6,6 @@
         </v-row> -->
     <v-row>
       <v-col>
-        <v-card>
-          <v-card-text>
-            <div id="chart" v-if="categories.length > 0"></div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-    <v-row>
-      <v-col>
         <v-data-table
           v-if="this.jsonData.length > 0"
           :headers="headers"
