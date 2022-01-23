@@ -110,38 +110,11 @@
     <v-main>
       <!-- Provides the application the proper gutter -->
       <!-- <router-view></router-view> -->
-      <v-container fluid>
-        <!-- <v-row>
-          <v-col cols="6"> // placeholder </v-col>
-          <v-col cols="6"> // placeholder </v-col>
-        </v-row> -->
-        <v-row>
-          <v-col>
-            <v-card>
-              <v-card-text>
-                <div id="chart" v-if="categories.length > 0"></div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col>
-            <v-data-table
-              v-if="this.jsonData.length > 0"
-              :headers="headers"
-              :items="jsonData"
-              dense
-              :search="search"
-            >
-              <template v-slot:item.identified="{ item }">
-                <span :class="`${getColor(item.identified)}--text`">{{
-                  item.identified
-                }}</span>
-              </template>
-            </v-data-table>
-          </v-col>
-        </v-row>
-      </v-container>
+      <Table
+        :jsonData="jsonData"
+        :categories="categories"
+        :getColorFn="getColor"
+      />
     </v-main>
 
     <v-footer app>
@@ -170,6 +143,7 @@
 
 <script lang="ts">
 import Vue from "vue";
+import { mapState } from "vuex";
 import * as XLSX from "xlsx";
 // import "@types/lodash";
 import * as _ from "lodash";
@@ -182,36 +156,10 @@ import {
   prepareLineData
 } from "@/api.charts";
 
+import Table from "@/views/Table.vue";
 import Settings from "@/components/Settings.vue";
 
 import { Category, Message } from "@/types";
-
-function ExcelDateToJSDate(serialStr: string) {
-  let serial = parseInt(serialStr);
-  var utc_days = Math.floor(serial - 25569);
-  var utc_value = utc_days * 86400;
-  var date_info = new Date(utc_value * 1000);
-
-  var fractional_day = serial - Math.floor(serial) + 0.0000001;
-
-  var total_seconds = Math.floor(86400 * fractional_day);
-
-  var seconds = total_seconds % 60;
-
-  total_seconds -= seconds;
-
-  var hours = Math.floor(total_seconds / (60 * 60));
-  var minutes = Math.floor(total_seconds / 60) % 60;
-
-  return new Date(
-    date_info.getFullYear(),
-    date_info.getMonth(),
-    date_info.getDate(),
-    hours,
-    minutes,
-    seconds
-  );
-}
 
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
 
@@ -225,24 +173,30 @@ export default Vue.extend({
     coverage: 0 as number,
     file: [] as File[],
     jsonFile: [] as File[],
-    jsonData: [] as any[],
-    search: "" as string,
-    categories: [] as Category[],
+    // jsonData: [] as any[],
+    // categories: [] as Category[],
     expenses: [] as any[],
     columns: [] as string[],
-    panel: true as boolean,
-    message: { type: "info", content: "Please load an expense file" } as Message
+    panel: true as boolean
   }),
-  components: { Settings },
+  components: { Table, Settings },
   computed: {
-    headers: function () {
-      let h = Object.keys(this.jsonData[0]).map(d => ({
-        text: d,
-        value: d,
-        width: "5"
-      }));
-      h.push({ text: "Categoria", value: "identified", width: "20" });
-      return h;
+    ...mapState(["message"]),
+    jsonData: {
+      get() {
+        return this.$store.state.jsonData as any[];
+      },
+      set(value) {
+        this.$store.commit("storeJsonData", value);
+      }
+    },
+    categories: {
+      get() {
+        return this.$store.state.categories as Category[];
+      },
+      set(value) {
+        this.$store.commit("storeCategories", value);
+      }
     }
   },
   mounted() {
