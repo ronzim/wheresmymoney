@@ -239,6 +239,16 @@ export default Vue.extend({
         const jsonData = XLSX.utils.sheet_to_json(first_worksheet, {
           // header: 1
         });
+
+        // convert dates to string
+        jsonData.forEach(data => {
+          for (let key in data) {
+            if (data[key] instanceof Date) {
+              data[key] = data[key].toLocaleDateString();
+            }
+          }
+        });
+
         this.jsonData = jsonData;
         console.log("jsonData", this.jsonData);
         this.columns = jsonData[0]

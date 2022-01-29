@@ -18,6 +18,7 @@ export function prepareLineData(
 
   // Divide each category (this can be shared with prepareBarData)
   categories.forEach((category: any) => {
+    console.log(category);
     // filter by tags
     const entries = _.filter(jsonData, function (d: any) {
       // they say a simple for loop would be faster...
@@ -37,8 +38,11 @@ export function prepareLineData(
       return -d[columns.values];
     });
 
+    console.log(entries);
+
     const byDate = _.groupBy(entries, function (d: any) {
-      return d["Data Valuta"].getMonth();
+      // return d["Data Valuta"].getMonth();
+      return d["Data Valuta"].split("/")[1]; // dates have been transformed into strings (NOTE: using local this works only for local = IT ?)
     });
 
     // sum each group

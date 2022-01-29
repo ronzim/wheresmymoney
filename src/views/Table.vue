@@ -47,7 +47,7 @@ export default Vue.extend({
       let h = Object.keys(this.jsonData[0]).map(d => ({
         text: d,
         value: d,
-        width: "5"
+        width: "50"
       }));
       h.push({ text: "Categoria", value: "identified", width: "20" });
       return h;
