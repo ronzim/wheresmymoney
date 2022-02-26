@@ -12,6 +12,7 @@
           :items="jsonData"
           dense
           :search="search"
+          :item-class="rowClasses"
         >
           <template v-slot:item.identified="{ item }">
             <span :class="`${getColorFn(item.identified)}--text`">{{
@@ -49,10 +50,27 @@ export default Vue.extend({
         value: d,
         width: "50"
       }));
-      h.push({ text: "Categoria", value: "identified", width: "20" });
+      // h.push({ text: "Categoria", value: "identified", width: "20" });
+      h[h.length - 1].text = "Categoria";
+      h.push({ text: "Tags", value: "tag", width: "20" });
+      console.log(h);
       return h;
     }
   },
-  methods: {}
+  methods: {
+    rowClasses(item) {
+      if (item.identified === undefined) {
+        return "orange"; //can also return multiple classes e.g ["orange","disabled"]
+      }
+    }
+  }
 });
 </script>
+
+.orange { background-color: orange; }
+
+<style>
+.orange {
+  background-color: orange;
+}
+</style>

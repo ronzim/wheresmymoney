@@ -51,7 +51,7 @@
       </div>
 
       <div
-        v-if="jsonData.length > 0"
+        v-if="jsonData.length > 0 && valueCol && descCol"
         style="border: 1px solid grey; border-radius: 6px"
         class="ma-2"
       >
@@ -168,9 +168,9 @@ import * as _ from "lodash";
 // import categories from "@/categories";
 // import BarChart from "./BarChart.vue";
 import {
-  drawChart,
-  drawLineChart,
-  prepareBarData,
+  // drawChart,
+  // drawLineChart,
+  // prepareBarData,
   prepareLineData
 } from "@/api.charts";
 
@@ -178,6 +178,7 @@ import {
 import Settings from "@/components/Settings.vue";
 
 import { Category, Message } from "@/types";
+import store from "./store";
 
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
 
@@ -199,6 +200,14 @@ export default Vue.extend({
   components: { Settings },
   computed: {
     ...mapState(["message"]),
+    allDataReady() {
+      return (
+        this.valueCol &&
+        this.descCol &&
+        this.categories.length > 0 &&
+        this.jsonData.length > 0
+      );
+    },
     jsonData: {
       get() {
         return this.$store.state.jsonData as any[];
@@ -217,12 +226,17 @@ export default Vue.extend({
     }
   },
   mounted() {
+    const storedCategories = localStorage.getItem("expCategories");
+    if (storedCategories) {
+      this.categories = JSON.parse(storedCategories);
+      this.jsonFile = [new File([storedCategories], "ciccio")];
+    }
     // dev
     // console.warn("DEV file");
     // fetch(
     //   "/mnt/c/Users/Mattia-DVLab/Desktop/conti2021/movimentiConto2021.xls"
-    // ).then(res => {
-    //   res.arrayBuffer().then(content => {
+    // ).then(function (res) {
+    //   res.arrayBuffer().then(function (content) {
     //     this.loadFile(new File([content], "ciccio"));
     //   });
     // });
@@ -261,7 +275,7 @@ export default Vue.extend({
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
           console.log("cat", this.categories);
-          if (this.categories.length > 0) {
+          if (this.allDataReady) {
             this.computeAndRender();
           } else {
             setTimeout(() => {
@@ -279,11 +293,14 @@ export default Vue.extend({
       console.log(this.jsonData);
       this.message.type = "success";
       this.message.content = "Successfully loaded category file";
-      if (this.jsonData.length > 0) {
+      if (this.allDataReady) {
         this.computeAndRender();
       }
+      // store locally
+      localStorage.setItem("expCategories", JSON.stringify(json));
     },
     computeAndRender: function () {
+      console.log("compute and render");
       const { expenses, idExp, coverage } = prepareLineData(
         this.jsonData,
         this.categories,
@@ -303,6 +320,18 @@ export default Vue.extend({
         .filter(c => c.name == categoryName)
         .pop();
       return categoryObj ? categoryObj.color : "white";
+    }
+  },
+  watch: {
+    valueCol: function () {
+      if (this.allDataReady) {
+        this.computeAndRender();
+      }
+    },
+    descCol: function () {
+      if (this.allDataReady) {
+        this.computeAndRender();
+      }
     }
   }
 });

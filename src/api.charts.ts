@@ -18,17 +18,23 @@ export function prepareLineData(
 
   // Divide each category (this can be shared with prepareBarData)
   categories.forEach((category: any) => {
-    console.log(category);
     // filter by tags
     const entries = _.filter(jsonData, function (d: any) {
+      const foundTags: string[] = [];
       // they say a simple for loop would be faster...
       const containsTags = category.tags.some(function (tag: string) {
-        return d[columns.description].includes(tag);
+        const hasTag = d[columns.description].includes(tag);
+        if (hasTag) {
+          foundTags.push(tag);
+        }
+        return hasTag;
+        // return d[columns.description].includes(tag);
       });
 
       // store identified
       if (!d["identified"]) {
         d["identified"] = containsTags ? category.name : undefined;
+        d["tags"] = foundTags;
       }
 
       return containsTags;
@@ -37,8 +43,6 @@ export function prepareLineData(
     const sum = _.sumBy(entries, function (d: any) {
       return -d[columns.values];
     });
-
-    console.log(entries);
 
     const byDate = _.groupBy(entries, function (d: any) {
       // return d["Data Valuta"].getMonth();
@@ -74,6 +78,7 @@ export function prepareLineData(
   return { expenses, idExp, coverage };
 }
 
+/* old function
 export function prepareBarData(
   jsonData: any,
   categories: Category[],
@@ -92,14 +97,20 @@ export function prepareBarData(
   categories.forEach((category: any) => {
     // filter by tags
     const entries = _.filter(jsonData, function (d: any) {
+      const foundTags: string[] = [];
       // they say a simple for loop would be faster...
       const containsTags = category.tags.some(function (tag: string) {
-        return d[columns.description].includes(tag);
+        const hasTag = d[columns.description].includes(tag);
+        if (hasTag) {
+          foundTags.push(tag);
+        }
+        return hasTag;
       });
 
       // store identified
       if (!d["identified"]) {
         d["identified"] = containsTags ? category.name : undefined;
+        d["tags"] = foundTags;
       }
 
       return containsTags;
@@ -110,6 +121,8 @@ export function prepareBarData(
     });
     expenses.push({ category: category.name, value: sum });
   });
+
+  console.log("expenses", expenses);
 
   expenses.forEach(e => console.log(e));
   // console.log(expenses);
@@ -124,6 +137,7 @@ export function prepareBarData(
 
   return { expenses, idExp, coverage };
 }
+*/
 
 export function drawChart(expenses: any, getColor: (a: string) => string) {
   // const chartData: Plotly.BarData[] = [
