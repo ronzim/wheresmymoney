@@ -123,16 +123,10 @@
     <v-main>
       <!-- Provides the application the proper gutter -->
       <router-view
-        :jsonData="jsonData"
         :expenses="expenses"
         :categories="categories"
         :getColorFn="getColor"
       ></router-view>
-      <!-- <Table
-        :jsonData="jsonData"
-        :categories="categories"
-        :getColorFn="getColor"
-      /> -->
     </v-main>
 
     <v-footer app>
@@ -315,7 +309,7 @@ export default Vue.extend({
       this.expenses = expenses;
 
       // change view
-      this.$router.push("chart");
+      // this.$router.push("chart");
     },
     getColor: function (categoryName: string) {
       let categoryObj = this.categories

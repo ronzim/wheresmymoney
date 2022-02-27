@@ -20,12 +20,12 @@ export function prepareLineData(
   categories.forEach((category: any) => {
     // filter by tags
     const entries = _.filter(jsonData, function (d: any) {
-      const foundTags: string[] = [];
+      let foundTag = "";
       // they say a simple for loop would be faster...
       const containsTags = category.tags.some(function (tag: string) {
         const hasTag = d[columns.description].includes(tag);
         if (hasTag) {
-          foundTags.push(tag);
+          foundTag = tag;
         }
         return hasTag;
         // return d[columns.description].includes(tag);
@@ -34,7 +34,7 @@ export function prepareLineData(
       // store identified
       if (!d["identified"]) {
         d["identified"] = containsTags ? category.name : undefined;
-        d["tags"] = foundTags;
+        d["tag"] = foundTag;
       }
 
       return containsTags;

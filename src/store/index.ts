@@ -17,6 +17,9 @@ export default new Vuex.Store({
     },
     storeCategories(state, value) {
       state.categories = value;
+    },
+    updateDataTag(state, [index, value]) {
+      Vue.set(state.jsonData, index, value);
     }
   },
   actions: {},
