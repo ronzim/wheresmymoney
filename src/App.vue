@@ -272,6 +272,8 @@ export default Vue.extend({
         this.message.type = "success";
         this.message.content = "Successfully loaded expense file";
 
+        this.guessColumns();
+
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
           console.log("cat", this.categories);
@@ -320,6 +322,23 @@ export default Vue.extend({
         .filter(c => c.name == categoryName)
         .pop();
       return categoryObj ? categoryObj.color : "white";
+    },
+    guessColumns: function () {
+      console.log(this.columns);
+      // TODO generalize
+      let guessedDesc = this.columns.find(col =>
+        col.toLowerCase().includes("desc")
+      );
+      let guessedVal = this.columns.find(col =>
+        col.toLowerCase().includes("importo")
+      );
+      console.log(guessedDesc, guessedVal);
+      if (guessedDesc) {
+        this.descCol = guessedDesc;
+      }
+      if (guessedVal) {
+        this.valueCol = guessedVal;
+      }
     }
   },
   watch: {
