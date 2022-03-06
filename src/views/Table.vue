@@ -14,31 +14,30 @@
           :search="search"
           :item-class="rowClasses"
           :items-per-page="100"
+          ref="table"
+          id="table"
         >
           <template v-slot:item.identified="{ item }">
-            <span
-              v-if="item.identified"
-              :class="`${getColorFn(item.identified)}--text`"
-              >{{ item.identified }}</span
+            <v-menu
+              v-model="item.index"
+              :close-on-content-click="true"
+              left
+              x-offset
             >
-            <!-- <v-select
-              v-else
-              v-model="item.identified"
-              :items="categoryNames"
-              dense
-              single-line
-            ></v-select> -->
-            <v-edit-dialog v-else @open="open(item)">
-              {{ item.tag }}
-              <template v-slot:input>
-                <v-select
-                  v-model="item.identified"
-                  :items="categoryNames"
-                  dense
-                  single-line
-                ></v-select>
+              <template v-slot:activator="{ on, attrs }">
+                <span
+                  :class="`${getColorFn(item.identified)}--text`"
+                  v-bind="attrs"
+                  v-on="on"
+                  >{{ item.identified || "choose" }}</span
+                >
               </template>
-            </v-edit-dialog>
+              <Categories
+                :categories="categories"
+                :getColorFn="getColorFn"
+                :item="item"
+              />
+            </v-menu>
           </template>
           <template v-slot:item.tag="{ item }">
             <v-edit-dialog @open="open(item)">
@@ -66,12 +65,16 @@ import Vue, { PropType } from "vue";
 import { Category, Message } from "@/types";
 import { mapState } from "vuex";
 
+import Categories from "@/components/Categories.vue";
+
 export default Vue.extend({
   name: "Table",
   data: () => ({
     search: "" as string,
-    changingData: "" as string
+    changingData: "" as string,
+    menu: false
   }),
+  components: { Categories },
   props: {
     categories: { type: [] as PropType<Category[]>, required: true },
     getColorFn: {
@@ -115,8 +118,8 @@ export default Vue.extend({
     },
     close(item) {
       const index = this.jsonData.indexOf(item);
-      console.log("close", item.tag, index);
-      this.$store.commit("updateDataTag", [index, item]);
+      console.log("close", item.tag, item.identified, index);
+      this.$store.commit("updateData", [index, item]);
     }
   }
 });
