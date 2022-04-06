@@ -126,6 +126,8 @@
         :expenses="expenses"
         :categories="categories"
         :getColorFn="getColor"
+        :jsonData="jsonData"
+        @changeCategory="computeAndRender"
       ></router-view>
     </v-main>
 
@@ -166,12 +168,12 @@ import {
   // drawLineChart,
   // prepareBarData,
   prepareLineData
-} from "@/api.charts";
+} from "./api.charts";
 
 // import Table from "@/views/Table.vue";
-import Settings from "@/components/Settings.vue";
+import Settings from "./components/Settings.vue";
 
-import { Category, Message } from "@/types";
+import { Category, Message } from "./types";
 import store from "./store";
 
 // https://hackernoon.com/creating-stunning-charts-with-vue-js-and-chart-js-28af584adc0a
@@ -225,15 +227,6 @@ export default Vue.extend({
       this.categories = JSON.parse(storedCategories);
       this.jsonFile = [new File([storedCategories], "ciccio")];
     }
-    // dev
-    // console.warn("DEV file");
-    // fetch(
-    //   "/mnt/c/Users/Mattia-DVLab/Desktop/conti2021/movimentiConto2021.xls"
-    // ).then(function (res) {
-    //   res.arrayBuffer().then(function (content) {
-    //     this.loadFile(new File([content], "ciccio"));
-    //   });
-    // });
   },
   methods: {
     async loadFile(target: File): Promise<void> {
@@ -286,7 +279,6 @@ export default Vue.extend({
       const data = await target.arrayBuffer();
       const json = JSON.parse(new TextDecoder().decode(data));
       this.categories = json;
-      console.log(this.jsonData);
       this.message.type = "success";
       this.message.content = "Successfully loaded category file";
       if (this.allDataReady) {
@@ -297,7 +289,7 @@ export default Vue.extend({
     },
     computeAndRender: function () {
       console.log("compute and render");
-      const { expenses, idExp, coverage } = prepareLineData(
+      const { expenses, idExp, coverage, jsonDataOut } = prepareLineData(
         this.jsonData,
         this.categories,
         { description: this.descCol, values: this.valueCol },
@@ -308,6 +300,8 @@ export default Vue.extend({
       this.coverage = coverage;
       this.expenses = expenses;
 
+      this.jsonData = jsonDataOut; // this trigger the re-render of the table
+
       // change view
       // this.$router.push("chart");
     },
@@ -315,7 +309,7 @@ export default Vue.extend({
       let categoryObj = this.categories
         .filter(c => c.name == categoryName)
         .pop();
-      return categoryObj ? categoryObj.color : "white";
+      return categoryObj ? categoryObj.color : "gray";
     },
     guessColumns: function () {
       console.log(this.columns);

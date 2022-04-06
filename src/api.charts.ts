@@ -11,15 +11,17 @@ export function prepareLineData(
 ) {
   let expenses: any[] = [];
   // remove "positive" data
-  if (filterPositiveData) {
-    jsonData = jsonData.filter((d: any) => d[columns.values] < 0);
-  }
-  const totalExpenses = _.sumBy(jsonData, columns.values);
+  // if (filterPositiveData) {
+  const jsonDataOut = filterPositiveData
+    ? jsonData.filter((d: any) => d[columns.values] < 0)
+    : jsonData.slice();
+  // }
+  const totalExpenses = _.sumBy(jsonDataOut, columns.values);
 
   // Divide each category (this can be shared with prepareBarData)
   categories.forEach((category: any) => {
     // filter by tags
-    const entries = _.filter(jsonData, function (d: any) {
+    const entries = _.filter(jsonDataOut, function (d: any) {
       let foundTag = "";
       // they say a simple for loop would be faster...
       const containsTags = category.tags.some(function (tag: string) {
@@ -32,8 +34,10 @@ export function prepareLineData(
       });
 
       // store identified
+      // console.log(containsTags, d["identified"]);
       if (!d["identified"]) {
         d["identified"] = containsTags ? category.name : undefined;
+        // console.log("-->", d["identified"]);
         d["tag"] = foundTag;
       }
 
@@ -75,7 +79,7 @@ export function prepareLineData(
 
   expenses = _.sortBy(expenses, "value");
 
-  return { expenses, idExp, coverage };
+  return { expenses, idExp, coverage, jsonDataOut };
 }
 
 /* old function

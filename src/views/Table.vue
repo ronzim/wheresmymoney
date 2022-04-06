@@ -36,6 +36,7 @@
                 :categories="categories"
                 :getColorFn="getColorFn"
                 :item="item"
+                @click="emitChangeCategory"
               />
             </v-menu>
           </template>
@@ -90,8 +91,12 @@ export default Vue.extend({
         value: d,
         width: "50"
       }));
+      console.log(h);
       let identifiedIndex = h.findIndex(str => str.value == "identified");
-      h[identifiedIndex].text = "Categoria";
+      console.log(identifiedIndex);
+      if (identifiedIndex >= 0) {
+        h[identifiedIndex].text = "Categoria";
+      }
       console.log("headers", h);
       return h;
     },
@@ -120,6 +125,9 @@ export default Vue.extend({
       const index = this.jsonData.indexOf(item);
       console.log("close", item.tag, item.identified, index);
       this.$store.commit("updateData", [index, item]);
+    },
+    emitChangeCategory() {
+      this.$emit("changeCategory");
     }
   }
 });
