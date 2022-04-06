@@ -82,67 +82,6 @@ export function prepareLineData(
   return { expenses, idExp, coverage, jsonDataOut };
 }
 
-/* old function
-export function prepareBarData(
-  jsonData: any,
-  categories: Category[],
-  columns: { description: string; values: string },
-  filterPositiveData: boolean
-) {
-  let expenses: any[] = [];
-  // remove "positive" data
-  if (filterPositiveData) {
-    jsonData = jsonData.filter((d: any) => d[columns.values] < 0);
-  }
-
-  const totalExpenses = _.sumBy(jsonData, columns.values);
-
-  // Sum for each category
-  categories.forEach((category: any) => {
-    // filter by tags
-    const entries = _.filter(jsonData, function (d: any) {
-      const foundTags: string[] = [];
-      // they say a simple for loop would be faster...
-      const containsTags = category.tags.some(function (tag: string) {
-        const hasTag = d[columns.description].includes(tag);
-        if (hasTag) {
-          foundTags.push(tag);
-        }
-        return hasTag;
-      });
-
-      // store identified
-      if (!d["identified"]) {
-        d["identified"] = containsTags ? category.name : undefined;
-        d["tags"] = foundTags;
-      }
-
-      return containsTags;
-    });
-    // sum filtered values
-    const sum = _.sumBy(entries, function (d: any) {
-      return d[columns.values];
-    });
-    expenses.push({ category: category.name, value: sum });
-  });
-
-  console.log("expenses", expenses);
-
-  expenses.forEach(e => console.log(e));
-  // console.log(expenses);
-
-  const coverage = _.sumBy(expenses, "value") / totalExpenses;
-  console.log("identified exp", _.sumBy(expenses, "value"));
-  console.log("coverage:", (coverage * 100).toFixed(1), "%");
-
-  const idExp = _.sumBy(expenses, "value");
-
-  expenses = _.sortBy(expenses, "value");
-
-  return { expenses, idExp, coverage };
-}
-*/
-
 export function drawChart(expenses: any, getColor: (a: string) => string) {
   // const chartData: Plotly.BarData[] = [
   const chartData: any = [
@@ -191,9 +130,8 @@ export function drawLineChart(expenses: any, getColor: (a: string) => string) {
       x: Object.keys(exp.byDate),
       y: Object.values(exp.byDate),
       name: exp.category,
-      line: {
-        width: 2,
-        color: expenses.map((e: any) => getColor(e.category))
+      marker: {
+        color: getColor(exp.category)
       }
     };
   });
@@ -209,6 +147,8 @@ export function drawLineChart(expenses: any, getColor: (a: string) => string) {
       color: "#afafaf"
     }
   };
+
+  console.log(chartData);
 
   Plotly.newPlot("chart", chartData, layout, { responsive: true });
 

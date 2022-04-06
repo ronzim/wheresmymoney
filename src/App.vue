@@ -306,9 +306,12 @@ export default Vue.extend({
       // this.$router.push("chart");
     },
     getColor: function (categoryName: string) {
+      console.log("cat", categoryName);
       let categoryObj = this.categories
         .filter(c => c.name == categoryName)
         .pop();
+      console.log("obj", categoryObj ? categoryObj.color : "?");
+
       return categoryObj ? categoryObj.color : "gray";
     },
     guessColumns: function () {

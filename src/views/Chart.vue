@@ -13,9 +13,9 @@
 <script lang="ts">
 import Vue, { PropType } from "vue";
 
-import { Category, Message } from "@/types";
+import { Category, Message } from "../types";
 
-import { drawLineChart } from "@/api.charts";
+import { drawLineChart } from "../api.charts";
 
 export default Vue.extend({
   name: "Table",

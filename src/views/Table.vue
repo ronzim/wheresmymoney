@@ -26,7 +26,7 @@
             >
               <template v-slot:activator="{ on, attrs }">
                 <span
-                  :class="`${getColorFn(item.identified)}--text`"
+                  :style="`color:${getColorFn(item.identified)}`"
                   v-bind="attrs"
                   v-on="on"
                   >{{ item.identified || "choose" }}</span
