@@ -2,6 +2,7 @@ import * as Plotly from "plotly.js";
 import * as _ from "lodash";
 
 import { Category, PlotHTMLElement } from "@/types";
+import { sum } from "lodash";
 
 export function prepareLineData(
   jsonData: any,
@@ -50,7 +51,7 @@ export function prepareLineData(
 
     const byDate = _.groupBy(entries, function (d: any) {
       // return d["Data Valuta"].getMonth();
-      return d["Data Valuta"].split("/")[1]; // dates have been transformed into strings (NOTE: using local this works only for local = IT ?)
+      return d["Data Contabile"].split("/")[1]; // dates have been transformed into strings (NOTE: using local this works only for local = IT ?)
     });
 
     // sum each group
@@ -109,6 +110,9 @@ export function drawChart(expenses: any, getColor: (a: string) => string) {
       family: "Avenir, Helvetica, Arial, sans-serif",
       size: 14,
       color: "#afafaf"
+    },
+    xaxis: {
+      dtick: 1
     }
   };
 
@@ -148,12 +152,56 @@ export function drawLineChart(expenses: any, getColor: (a: string) => string) {
     }
   };
 
+  // add labels
+  // chartData.push({
+  //   type: "indicator",
+  //   mode: "number+delta",
+  //   value: 492,
+  //   delta: { reference: 512, valueformat: ".0f" },
+  //   ticker: { showticker: true },
+  //   vmax: 500,
+  //   domain: { y: [0, 1], x: [0.25, 0.75] },
+  //   title: { text: "Users online" }
+  // });
+
+  const expByDate = expenses.map((e: any) => e.byDate);
+
+  const labelsData = chartData.map((cd: any, i: number) => ({
+    type: "indicator",
+    mode: "number+delta",
+    // mode: "number",
+    value: _.sum(expByDate.map((d: any) => d[(i + 1).toString()])),
+    delta: {
+      reference: _.sum(expByDate.map((d: any) => d[i.toString()])),
+      valueformat: ".0f",
+      decreasing: {
+        color: "#3D9970"
+      },
+      increasing: {
+        color: "#FF4136"
+      }
+    },
+    ticker: { showticker: true },
+    domain: {
+      y: [0.5, 1],
+      x: [(i * 1) / 4, (i + 1) / 4]
+    },
+    title: { text: (i + 1).toString() },
+    number: { prefix: "€", font: { size: 26 } }
+  }));
+
   console.log(chartData);
 
-  Plotly.newPlot("chart", chartData, layout, { responsive: true });
+  Plotly.newPlot("chart", chartData.concat(labelsData), layout, {
+    responsive: true
+  });
 
   const graphDiv = <PlotHTMLElement>document.getElementById("chart")!;
   graphDiv.on("plotly_selected", function (eventData: any) {
     console.log(eventData);
+    console.warn(
+      "total selected",
+      _.sum(eventData.points.map((p: any) => p.value))
+    );
   });
 }
