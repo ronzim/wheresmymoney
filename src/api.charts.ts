@@ -50,8 +50,9 @@ export function prepareLineData(
     });
 
     const byDate = _.groupBy(entries, function (d: any) {
-      // return d["Data Valuta"].getMonth();
-      return d["Data Contabile"].split("/")[1]; // dates have been transformed into strings (NOTE: using local this works only for local = IT ?)
+      // dates have been transformed into strings (NOTE: using local this works only for local = IT ?)
+      return (new Date(d["Data Contabile"]).getMonth() + 1).toString();
+      // return d["Data Contabile"].split("/")[1];
     });
 
     // sum each group
