@@ -151,47 +151,38 @@ export function drawLineChart(expenses: any, getColor: (a: string) => string) {
       size: 14,
       color: "#afafaf"
     }
+    // barmode: "stack"
   };
-
-  // add labels
-  // chartData.push({
-  //   type: "indicator",
-  //   mode: "number+delta",
-  //   value: 492,
-  //   delta: { reference: 512, valueformat: ".0f" },
-  //   ticker: { showticker: true },
-  //   vmax: 500,
-  //   domain: { y: [0, 1], x: [0.25, 0.75] },
-  //   title: { text: "Users online" }
-  // });
 
   const expByDate = expenses.map((e: any) => e.byDate);
 
-  const labelsData = chartData.map((cd: any, i: number) => ({
-    type: "indicator",
-    mode: "number+delta",
-    // mode: "number",
-    value: _.sum(expByDate.map((d: any) => d[(i + 1).toString()])),
-    delta: {
-      reference: _.sum(expByDate.map((d: any) => d[i.toString()])),
-      valueformat: ".0f",
-      decreasing: {
-        color: "#3D9970"
+  const labelsData = chartData
+    .map((cd: any, i: number) => ({
+      type: "indicator",
+      mode: "number+delta",
+      // mode: "number",
+      value: _.sum(expByDate.map((d: any) => d[(i + 1).toString()])),
+      delta: {
+        reference: _.sum(expByDate.map((d: any) => d[i.toString()])),
+        valueformat: ".0f",
+        decreasing: {
+          color: "#3D9970"
+        },
+        increasing: {
+          color: "#FF4136"
+        }
       },
-      increasing: {
-        color: "#FF4136"
-      }
-    },
-    ticker: { showticker: true },
-    domain: {
-      y: [0.5, 1],
-      x: [(i * 1) / 4, (i + 1) / 4]
-    },
-    title: { text: (i + 1).toString() },
-    number: { prefix: "€", font: { size: 26 } }
-  }));
+      ticker: { showticker: true },
+      domain: {
+        y: [0.5, 1],
+        x: [(i * 1) / 6, (i + 1) / 6]
+      },
+      title: { text: (i + 1).toString() },
+      number: { prefix: "€", font: { size: 26 } }
+    }))
+    .filter((ld: any) => ld.value);
 
-  console.log(chartData);
+  console.log(labelsData);
 
   Plotly.newPlot("chart", chartData.concat(labelsData), layout, {
     responsive: true
