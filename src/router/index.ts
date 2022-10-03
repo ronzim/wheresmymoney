@@ -2,6 +2,7 @@ import Vue from "vue";
 import VueRouter, { RouteConfig } from "vue-router";
 import Table from "@/views/Table.vue";
 import Chart from "@/views/Chart.vue";
+import Chart2 from "@/views/Chart2.vue";
 
 Vue.use(VueRouter);
 
@@ -19,6 +20,12 @@ const routes: Array<RouteConfig> = [
     // which is lazy-loaded when the route is visited.
     component: () =>
       import(/* webpackChunkName: "about" */ "../views/Chart.vue")
+  },
+  {
+    path: "/totals",
+    name: "Totals",
+    component: () =>
+      import(/* webpackChunkName: "about" */ "../views/Chart2.vue")
   }
 ];
 

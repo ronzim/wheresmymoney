@@ -182,15 +182,57 @@ export function drawLineChart(expenses: any, getColor: (a: string) => string) {
     }))
     .filter((ld: any) => ld.value);
 
-  console.log(labelsData);
-
   Plotly.newPlot("chart", chartData.concat(labelsData), layout, {
     responsive: true
   });
 
   const graphDiv = <PlotHTMLElement>document.getElementById("chart")!;
   graphDiv.on("plotly_selected", function (eventData: any) {
-    console.log(eventData);
+    console.warn(
+      "total selected",
+      _.sum(eventData.points.map((p: any) => p.value))
+    );
+  });
+}
+
+export function drawTotalsChart(
+  expenses: any,
+  getColor: (a: string) => string
+) {
+  console.log(expenses);
+
+  // const chartData: Plotly.BarData[] = [
+  const chartData: any = {
+    type: "bar",
+    x: expenses.map(exp => exp.category),
+    y: expenses.map(exp => exp.value),
+    name: expenses.map(exp => exp.category),
+    marker: {
+      color: expenses.map(exp => getColor(exp.category))
+    }
+  };
+
+  const layout: Partial<Plotly.Layout> = {
+    height: 600,
+    title: "Sum by category",
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: {
+      family: "Avenir, Helvetica, Arial, sans-serif",
+      size: 14,
+      color: "#afafaf"
+    }
+    // barmode: "stack"
+  };
+
+  console.log(chartData);
+
+  Plotly.newPlot("chart2", [chartData], layout, {
+    responsive: true
+  });
+
+  const graphDiv = <PlotHTMLElement>document.getElementById("chart2")!;
+  graphDiv.on("plotly_selected", function (eventData: any) {
     console.warn(
       "total selected",
       _.sum(eventData.points.map((p: any) => p.value))

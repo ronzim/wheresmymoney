@@ -110,6 +110,10 @@
           <v-icon class="mr-2">mdi-poll</v-icon>
           Chart
         </v-btn>
+        <v-btn to="/totals">
+          <v-icon class="mr-2">mdi-poll</v-icon>
+          Totals
+        </v-btn>
         <!-- <v-btn>
           <v-icon>mdi-format-align-right</v-icon>
         </v-btn>
@@ -263,7 +267,6 @@ export default Vue.extend({
 
         setTimeout(() => {
           // it seems that the div is not ready (mounted ?) try with next tick
-          console.log("cat", this.categories);
           if (this.allDataReady) {
             this.computeAndRender();
           } else {
@@ -306,11 +309,9 @@ export default Vue.extend({
       // this.$router.push("chart");
     },
     getColor: function (categoryName: string) {
-      console.log("cat", categoryName);
       let categoryObj = this.categories
         .filter(c => c.name == categoryName)
         .pop();
-      console.log("obj", categoryObj ? categoryObj.color : "?");
 
       return categoryObj ? categoryObj.color : "gray";
     },
