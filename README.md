@@ -58,6 +58,122 @@ Comando utile:
 uv run wheresmymoney-list-categories
 ```
 
+## Punto 6 implementato
+
+Il layer di regole deterministiche prima dell'LLM e' ora disponibile e validato.
+
+File introdotti:
+
+- `src/wheresmymoney/deterministic_rules.py`: caricamento e applicazione delle regole
+- `tests/test_deterministic_rules.py`: test unitari sul motore regole
+
+Comportamento:
+
+- le regole vengono lette da JSON
+- ogni regola usa oggi il criterio `contains`
+- la categoria di ogni regola viene validata contro il catalogo reale categorie
+- il primo match vince
+- i match vengono tracciati con `classification_source = "rule"`
+- le transazioni non matchate restano separate e possono passare all'LLM
+
+## Punto 7 implementato
+
+Il classificatore LLM con output strutturato e fallback locale e' ora disponibile.
+
+File introdotti:
+
+- `src/wheresmymoney/llm_categorizer.py`: prompt, chiamata al modello, parsing JSON e fallback
+- `tests/test_llm_categorizer.py`: test unitari del classificatore
+
+Comportamento:
+
+- il prompt richiede JSON puro con `assigned_category` e `cleaned_description`
+- si passano al modello solo le transazioni gia' rimaste fuori dalle regole deterministiche
+- la risposta viene validata localmente con parser JSON esplicito
+- la categoria viene validata contro il catalogo categorie
+- in caso di JSON invalido o categoria fuori lista si usa `Da Verificare`
+- in fallback `cleaned_description` resta una versione sicura della descrizione originale
+
+## Punto 8 implementato
+
+La CLI interattiva di revisione e' ora disponibile come modulo applicativo testabile.
+
+File introdotti:
+
+- `src/wheresmymoney/review_cli.py`: revisione interattiva riga per riga
+- `tests/test_review_cli.py`: test della CLI con input simulato
+
+Comportamento:
+
+- mostra data, importo, descrizione originale, descrizione pulita e categoria proposta
+- permette di tenere la categoria corrente con Invio
+- permette di cambiare categoria scegliendo un indice dalla lista completa
+- mostra un riepilogo finale di tutte le transazioni prima della conferma
+- permette di riaprire una transazione dal riepilogo finale digitandone l'indice
+- chiede conferma finale prima della scrittura
+- permette annullamento completo senza side effect
+
+## Punto 9 implementato
+
+Il writer append-only verso Google Sheets e' ora implementato con mapping sicuro.
+
+File introdotti:
+
+- `src/wheresmymoney/sheet_writer.py`: writer append-only e integrazione gspread
+- `tests/test_sheet_writer.py`: test unitari su next row, mapping e range di scrittura
+
+Comportamento:
+
+- verifica che il tab sia tra quelli bancari autorizzati
+- legge l'header reale del foglio per decidere il mapping di scrittura
+- se il tab include `Mese`, scrive una formula `=MONTH(Bn)` nelle nuove righe
+- scrive solo righe nuove senza toccare quelle esistenti
+- usa il payload dominio senza includere `Mese` come dato sorgente
+
+## Punto 10 implementato
+
+La pipeline CLI end-to-end ora espone un comando unico con logging ed error handling.
+
+File introdotti:
+
+- `src/wheresmymoney/cli_import.py`: orchestration parse -> categorie -> regole -> LLM -> review -> append
+- `tests/test_cli_import.py`: test end-to-end locale con retry LLM e append simulato
+
+Comportamento:
+
+- aggiunge il comando `uv run wheresmymoney-import`
+- logga parse, caricamento categorie, regole, LLM, review e append
+- gestisce errori parser, config, Google Sheets e writer con messaggi CLI chiari
+- applica retry ragionato alla sola fase LLM in caso di errore esterno
+- supporta `--dry-run` per verificare il flusso senza scrittura
+
+Esempio d'uso:
+
+```bash
+uv run wheresmymoney-import test-data/ListaMovimenti.xlsx --bank Comune_bpm --dry-run
+```
+
+## Punto 11 completato
+
+La copertura test ora include anche un'integrazione live controllata su Google Sheets.
+
+File introdotti:
+
+- `tests/test_google_sheet_integration.py`: append reale su foglio di test con verifica post-scrittura
+
+Comportamento:
+
+- il test live e' gated da `WHERESMYMONEY_RUN_LIVE_TESTS=1`
+- usa la pipeline reale fino all'append su un tab bancario autorizzato
+- verifica formula `Mese`, data, importo, categoria e descrizione scritta
+- non tocca i tab di analisi
+
+Esempio d'uso:
+
+```bash
+WHERESMYMONEY_RUN_LIVE_TESTS=1 uv run pytest tests/test_google_sheet_integration.py
+```
+
 ## Punto 2 implementato
 
 Il bootstrap minimo del progetto Python ora include dipendenze, loader della

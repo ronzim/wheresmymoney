@@ -10,7 +10,7 @@ class RuntimeConfigError(ValueError):
 
 
 DEFAULT_TARGET_CONFIG_PATH = "config/target_sheet.example.json"
-DEFAULT_GEMINI_MODEL = "gemini-1.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
 
 @dataclass(frozen=True)

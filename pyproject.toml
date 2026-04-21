@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
+wheresmymoney-import = "wheresmymoney.cli_import:main"
 wheresmymoney-list-categories = "wheresmymoney.categories:cli_main"
 wheresmymoney-validate-config = "wheresmymoney.cli_validate_target_config:main"
 wheresmymoney-smoke-test = "wheresmymoney.cli_smoke_test:main"

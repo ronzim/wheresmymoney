@@ -140,75 +140,75 @@ Checklist operativa per implementare il MVP come pipeline CLI interattiva append
 
 5. Integrare le categorie dal Google Sheet
 
-- [ ] Leggere dinamicamente le categorie dal foglio `Categorie`
-- [ ] Validare che le categorie lette siano categorie foglia finali
-- [ ] Decidere la policy su eventuali categorie vuote o duplicate
-- [ ] Definire il fallback tecnico `Da Verificare`
+- [x] Leggere dinamicamente le categorie dal foglio `Categorie`
+- [x] Validare che le categorie lette siano categorie foglia finali
+- [x] Decidere la policy su eventuali categorie vuote o duplicate
+- [x] Definire il fallback tecnico `Da Verificare`
 
 6. Aggiungere regole deterministiche prima dell’LLM
 
-- [ ] Definire un formato configurabile per le regole di matching
-- [ ] Implementare il matching su descrizione o pattern ricorrenti
-- [ ] Applicare le regole prima di chiamare il classificatore LLM
-- [ ] Tracciare quali transazioni sono state classificate da regole e quali da LLM
+- [x] Definire un formato configurabile per le regole di matching
+- [x] Implementare il matching su descrizione o pattern ricorrenti
+- [x] Applicare le regole prima di chiamare il classificatore LLM
+- [x] Tracciare quali transazioni sono state classificate da regole e quali da LLM
 
 7. Implementare il classificatore LLM
 
-- [ ] Definire un prompt con istruzioni rigide e output JSON
-- [ ] Passare al modello solo le transazioni non risolte dalle regole
-- [ ] Validare localmente il JSON restituito
-- [ ] Verificare che la categoria restituita appartenga alla lista valida
-- [ ] In caso di errore o categoria fuori lista assegnare `Da Verificare`
-- [ ] Conservare una `cleaned_description` sicura anche nei fallback
+- [x] Definire un prompt con istruzioni rigide e output JSON
+- [x] Passare al modello solo le transazioni non risolte dalle regole
+- [x] Validare localmente il JSON restituito
+- [x] Verificare che la categoria restituita appartenga alla lista valida
+- [x] In caso di errore o categoria fuori lista assegnare `Da Verificare`
+- [x] Conservare una `cleaned_description` sicura anche nei fallback
 
 8. Costruire la CLI interattiva di revisione
 
-- [ ] Mostrare all’utente tutte le transazioni normalizzate e categorizzate
-- [ ] Per ogni transazione mostrare almeno data, importo, descrizione originale, descrizione pulita e categoria proposta
-- [ ] Permettere all’utente di accettare la categoria suggerita
-- [ ] Permettere all’utente di cambiarla scegliendo dalla lista completa delle categorie valide
-- [ ] Chiedere conferma finale prima della scrittura
-- [ ] Consentire annullamento completo senza side effect
+- [x] Mostrare all’utente tutte le transazioni normalizzate e categorizzate
+- [x] Per ogni transazione mostrare almeno data, importo, descrizione originale, descrizione pulita e categoria proposta
+- [x] Permettere all’utente di accettare la categoria suggerita
+- [x] Permettere all’utente di cambiarla scegliendo dalla lista completa delle categorie valide
+- [x] Chiedere conferma finale prima della scrittura
+- [x] Consentire annullamento completo senza side effect
 
 9. Implementare il writer append-only verso Google Sheets
 
-- [ ] Consentire scrittura solo nei tab bancari autorizzati
-- [ ] Bloccare qualunque tentativo di scrittura nei tab di analisi
-- [ ] Usare la riga iniziale fissa delle transazioni come vincolo di sicurezza
-- [ ] Mappare il modello canonico nell’ordine colonne del foglio
-- [ ] Non scrivere la colonna `Mese`
-- [ ] Appendere solo nuove righe senza aggiornare celle esistenti
-- [ ] Verificare che formule e storico restino intatti
+- [x] Consentire scrittura solo nei tab bancari autorizzati
+- [x] Bloccare qualunque tentativo di scrittura nei tab di analisi
+- [x] Usare la riga iniziale fissa delle transazioni come vincolo di sicurezza
+- [x] Mappare il modello canonico nell’ordine colonne del foglio
+- [x] Non scrivere la colonna `Mese`
+- [x] Appendere solo nuove righe senza aggiornare celle esistenti
+- [x] Verificare che formule e storico restino intatti
 
 10. Aggiungere logging ed error handling
 
-- [ ] Loggare parsing, classificazione, revisione e append
-- [ ] Gestire errori di lettura file
-- [ ] Gestire errori Google Sheets
-- [ ] Gestire errori LLM con retry ragionati dove opportuno
-- [ ] Restituire messaggi chiari in CLI in caso di fallimento
+- [x] Loggare parsing, classificazione, revisione e append
+- [x] Gestire errori di lettura file
+- [x] Gestire errori Google Sheets
+- [x] Gestire errori LLM con retry ragionati dove opportuno
+- [x] Restituire messaggi chiari in CLI in caso di fallimento
 
 11. Coprire il flusso con test
 
-- [ ] Scrivere test unitari per i parser
-- [ ] Scrivere test unitari per la lettura e validazione categorie
-- [ ] Scrivere test unitari per il mapping verso Sheets
-- [ ] Scrivere test unitari per i fallback del classificatore LLM
-- [ ] Scrivere test funzionali per la CLI interattiva
-- [ ] Preparare uno sheet di staging per i test di integrazione
-- [ ] Scrivere un test end-to-end da file grezzo a revisione CLI a append
+- [x] Scrivere test unitari per i parser
+- [x] Scrivere test unitari per la lettura e validazione categorie
+- [x] Scrivere test unitari per il mapping verso Sheets
+- [x] Scrivere test unitari per i fallback del classificatore LLM
+- [x] Scrivere test funzionali per la CLI interattiva
+- [x] Preparare uno sheet di staging per i test di integrazione
+- [x] Scrivere un test end-to-end da file grezzo a revisione CLI a append
 
 12. Definire il criterio di done del MVP
 
-- [ ] Un file grezzo bancario può essere importato correttamente
-- [ ] Le transazioni vengono normalizzate nel modello unico
-- [ ] Le categorie valide vengono lette dal foglio
-- [ ] La categorizzazione combina regole e LLM con fallback sicuro
-- [ ] L’utente può correggere ogni categoria da terminale
-- [ ] L’utente può confermare o annullare prima della scrittura
-- [ ] L’append scrive solo nel tab bancario corretto
-- [ ] Nessuna formula o dato esistente viene modificato
-- [ ] I tab di analisi non vengono mai toccati
+- [x] Un file grezzo bancario può essere importato correttamente
+- [x] Le transazioni vengono normalizzate nel modello unico
+- [x] Le categorie valide vengono lette dal foglio
+- [x] La categorizzazione combina regole e LLM con fallback sicuro
+- [x] L’utente può correggere ogni categoria da terminale
+- [x] L’utente può confermare o annullare prima della scrittura
+- [x] L’append scrive solo nel tab bancario corretto
+- [x] Nessuna formula o dato esistente viene modificato
+- [x] I tab di analisi non vengono mai toccati
 
 **Out of scope del MVP**
 
