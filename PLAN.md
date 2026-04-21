@@ -95,9 +95,123 @@ Dati di esempio e file di test vanno forniti in una cartella `test_data/` all'in
 
 ---
 
-## 4. Punti ancora da chiarire
+## Plan: Wheresmymoney MVP Checklist
 
-- "modello dati interno"
-- come gestire il layer di regole fisse da usare prima dell'llm
-- approfondire gestione errori
-- test
+Checklist operativa per implementare il MVP come pipeline CLI interattiva append-only verso Google Sheets.
+
+**Checklist**
+
+1. Bloccare la specifica del foglio target
+
+- [x] Confermare `spreadsheet_id` unico
+- [x] Confermare nome del foglio `Categorie`
+- [x] Elencare i tab bancari consentiti
+- [x] Elencare i due tab di analisi vietati
+- [x] Confermare la riga iniziale fissa delle transazioni
+- [x] Confermare l’ordine esatto delle colonne da scrivere nei tab bancari
+- [x] Decidere dove configurare eventuali regole deterministiche iniziali
+
+2. Preparare il bootstrap del progetto
+
+- [x] Creare la struttura base del progetto Python
+- [x] Definire le dipendenze minime (`pandas`, `gspread`, provider Gemini, `python-dotenv`, `openpyxl`, `pytest`)
+- [x] Preparare il caricamento della configurazione da `.env`
+- [x] Preparare la configurazione per Google Sheets
+- [x] Preparare la configurazione per il provider LLM
+- [x] Aggiungere uno smoke test di connessione ai servizi esterni
+
+3. Definire il modello dati canonico
+
+- [x] Formalizzare i campi del modello transazione (`source_bank`, `transaction_date`, `value_date`, `amount`, `currency`, `original_description`, `cleaned_description`, `assigned_category`)
+- [x] Definire la normalizzazione degli importi in un solo valore signed
+- [x] Definire quando usare `transaction_date` e quando `value_date`
+- [x] Escludere esplicitamente `Mese` dal payload di scrittura
+- [x] Definire eventuali campi tecnici opzionali per logging o debug
+
+4. Implementare i parser per banca
+
+- [ ] Raccogliere almeno un file grezzo anonimizzato per ogni banca supportata
+- [ ] Implementare un parser isolato per ogni formato banca
+- [ ] Gestire file CSV e XLSX dove necessario
+- [ ] Gestire banche con una colonna importo signed
+- [ ] Gestire banche con due colonne separate dare/avere
+- [ ] Scartare righe vuote, intestazioni duplicate e footer non pertinenti
+- [ ] Verificare che vengano importati tutti i movimenti
+
+5. Integrare le categorie dal Google Sheet
+
+- [ ] Leggere dinamicamente le categorie dal foglio `Categorie`
+- [ ] Validare che le categorie lette siano categorie foglia finali
+- [ ] Decidere la policy su eventuali categorie vuote o duplicate
+- [ ] Definire il fallback tecnico `Da Verificare`
+
+6. Aggiungere regole deterministiche prima dell’LLM
+
+- [ ] Definire un formato configurabile per le regole di matching
+- [ ] Implementare il matching su descrizione o pattern ricorrenti
+- [ ] Applicare le regole prima di chiamare il classificatore LLM
+- [ ] Tracciare quali transazioni sono state classificate da regole e quali da LLM
+
+7. Implementare il classificatore LLM
+
+- [ ] Definire un prompt con istruzioni rigide e output JSON
+- [ ] Passare al modello solo le transazioni non risolte dalle regole
+- [ ] Validare localmente il JSON restituito
+- [ ] Verificare che la categoria restituita appartenga alla lista valida
+- [ ] In caso di errore o categoria fuori lista assegnare `Da Verificare`
+- [ ] Conservare una `cleaned_description` sicura anche nei fallback
+
+8. Costruire la CLI interattiva di revisione
+
+- [ ] Mostrare all’utente tutte le transazioni normalizzate e categorizzate
+- [ ] Per ogni transazione mostrare almeno data, importo, descrizione originale, descrizione pulita e categoria proposta
+- [ ] Permettere all’utente di accettare la categoria suggerita
+- [ ] Permettere all’utente di cambiarla scegliendo dalla lista completa delle categorie valide
+- [ ] Chiedere conferma finale prima della scrittura
+- [ ] Consentire annullamento completo senza side effect
+
+9. Implementare il writer append-only verso Google Sheets
+
+- [ ] Consentire scrittura solo nei tab bancari autorizzati
+- [ ] Bloccare qualunque tentativo di scrittura nei tab di analisi
+- [ ] Usare la riga iniziale fissa delle transazioni come vincolo di sicurezza
+- [ ] Mappare il modello canonico nell’ordine colonne del foglio
+- [ ] Non scrivere la colonna `Mese`
+- [ ] Appendere solo nuove righe senza aggiornare celle esistenti
+- [ ] Verificare che formule e storico restino intatti
+
+10. Aggiungere logging ed error handling
+
+- [ ] Loggare parsing, classificazione, revisione e append
+- [ ] Gestire errori di lettura file
+- [ ] Gestire errori Google Sheets
+- [ ] Gestire errori LLM con retry ragionati dove opportuno
+- [ ] Restituire messaggi chiari in CLI in caso di fallimento
+
+11. Coprire il flusso con test
+
+- [ ] Scrivere test unitari per i parser
+- [ ] Scrivere test unitari per la lettura e validazione categorie
+- [ ] Scrivere test unitari per il mapping verso Sheets
+- [ ] Scrivere test unitari per i fallback del classificatore LLM
+- [ ] Scrivere test funzionali per la CLI interattiva
+- [ ] Preparare uno sheet di staging per i test di integrazione
+- [ ] Scrivere un test end-to-end da file grezzo a revisione CLI a append
+
+12. Definire il criterio di done del MVP
+
+- [ ] Un file grezzo bancario può essere importato correttamente
+- [ ] Le transazioni vengono normalizzate nel modello unico
+- [ ] Le categorie valide vengono lette dal foglio
+- [ ] La categorizzazione combina regole e LLM con fallback sicuro
+- [ ] L’utente può correggere ogni categoria da terminale
+- [ ] L’utente può confermare o annullare prima della scrittura
+- [ ] L’append scrive solo nel tab bancario corretto
+- [ ] Nessuna formula o dato esistente viene modificato
+- [ ] I tab di analisi non vengono mai toccati
+
+**Out of scope del MVP**
+
+- [ ] Deduplica automatica dei movimenti
+- [ ] UI web Streamlit nel primo rilascio
+- [ ] Supporto a più Google Sheet

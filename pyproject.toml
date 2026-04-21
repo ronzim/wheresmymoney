@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wheresmymoney"
+version = "0.1.0"
+description = "Import and categorize bank statements into Google Sheets."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "gspread",
+  "google-genai",
+  "openpyxl",
+  "pandas",
+  "python-dotenv",
+]
+
+[project.scripts]
+wheresmymoney-list-categories = "wheresmymoney.categories:cli_main"
+wheresmymoney-validate-config = "wheresmymoney.cli_validate_target_config:main"
+wheresmymoney-smoke-test = "wheresmymoney.cli_smoke_test:main"
+
+[dependency-groups]
+dev = [
+  "pytest",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wheresmymoney"]

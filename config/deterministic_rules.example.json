@@ -1,0 +1,12 @@
+{
+    "rules": [
+        {
+            "contains": "MUTUO",
+            "category": "Mutuo"
+        },
+        {
+            "contains": "SUPERMERCATO",
+            "category": "Spesa"
+        }
+    ]
+}
