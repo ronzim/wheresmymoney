@@ -28,6 +28,8 @@ from wheresmymoney.target_config import TargetSheetConfig, TargetSheetConfigErro
 
 
 LOGGER = logging.getLogger(__name__)
+ANSI_RESET = "\033[0m"
+ANSI_CATEGORY_COLORS = ("\033[96m", "\033[93m")
 
 
 class ImportCLIError(ValueError):
@@ -210,9 +212,11 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             llm_attempts=args.llm_attempts,
         )
+    except DeterministicRuleError as exc:
+        print(_format_import_error(exc, use_color=sys.stderr.isatty()), file=sys.stderr)
+        return 1
     except (
         CategoryError,
-        DeterministicRuleError,
         FileNotFoundError,
         gspread.GSpreadException,
         ImportCLIError,
@@ -225,6 +229,34 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     return 0
+
+
+def _format_import_error(exc: Exception, *, use_color: bool) -> str:
+    message = f"Import fallito: {exc}"
+    if not isinstance(exc, DeterministicRuleError) or not exc.available_categories:
+        return message
+
+    categories_block = _format_available_categories(
+        exc.available_categories,
+        use_color=use_color,
+    )
+    return f"{message}\nCategorie disponibili nel foglio:\n{categories_block}"
+
+
+def _format_available_categories(
+    categories: tuple[str, ...],
+    *,
+    use_color: bool,
+) -> str:
+    sorted_categories = sorted(categories, key=str.casefold)
+    lines = []
+    for index, category in enumerate(sorted_categories):
+        line = f"- {category}"
+        if use_color:
+            color = ANSI_CATEGORY_COLORS[index % len(ANSI_CATEGORY_COLORS)]
+            line = f"{color}{line}{ANSI_RESET}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _load_rules(
@@ -241,6 +273,7 @@ def _load_rules(
         candidate = runtime_config.target_sheet_config_path.parent.parent / rules_path
         if candidate.exists():
             rules_path = candidate
+
     return load_rules_func(rules_path, category_catalog)
 
 

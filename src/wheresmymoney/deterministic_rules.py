@@ -9,7 +9,14 @@ from wheresmymoney.models import Transaction
 
 
 class DeterministicRuleError(ValueError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        available_categories: tuple[str, ...] = (),
+    ) -> None:
+        super().__init__(message)
+        self.available_categories = available_categories
 
 
 @dataclass(frozen=True)
@@ -43,10 +50,25 @@ class RuleApplicationBatch:
     unmatched: tuple[Transaction, ...]
 
 
+@dataclass(frozen=True)
+class RuleLoadResult:
+    rules: tuple[DeterministicRule, ...]
+    skipped_rules: tuple[str, ...] = ()
+
+
 def load_deterministic_rules(
     file_path: str | Path,
     category_catalog: CategoryCatalog,
 ) -> tuple[DeterministicRule, ...]:
+    return load_deterministic_rules_report(file_path, category_catalog).rules
+
+
+def load_deterministic_rules_report(
+    file_path: str | Path,
+    category_catalog: CategoryCatalog,
+    *,
+    skip_unknown_categories: bool = False,
+) -> RuleLoadResult:
     path = Path(file_path)
     try:
         raw_config = json.loads(path.read_text(encoding="utf-8"))
@@ -60,16 +82,28 @@ def load_deterministic_rules(
         raise DeterministicRuleError("Rules file must contain a 'rules' list")
 
     rules: list[DeterministicRule] = []
+    skipped_rules: list[str] = []
     seen_contains: set[str] = set()
     for raw_rule in raw_rules:
         if not isinstance(raw_rule, dict):
             raise DeterministicRuleError("Each rule must be a JSON object")
+        contains = raw_rule.get("contains", "")
+        category_name = raw_rule.get("category", "")
         try:
-            category = category_catalog.ensure_valid(raw_rule.get("category", ""))
+            category = category_catalog.ensure_valid(category_name)
         except CategoryError as exc:
-            raise DeterministicRuleError(str(exc)) from exc
+            if skip_unknown_categories:
+                skipped_rules.append(
+                    f"{contains} -> {category_name}"
+                )
+                continue
+            raise DeterministicRuleError(
+                "Unknown category in deterministic rule: "
+                f"contains={contains!r}, category={category_name!r}",
+                available_categories=tuple(category_catalog.categories),
+            ) from exc
         rule = DeterministicRule(
-            contains=raw_rule.get("contains", ""),
+            contains=contains,
             category=category,
         )
         fingerprint = rule.contains.casefold()
@@ -80,7 +114,10 @@ def load_deterministic_rules(
         seen_contains.add(fingerprint)
         rules.append(rule)
 
-    return tuple(rules)
+    return RuleLoadResult(
+        rules=tuple(rules),
+        skipped_rules=tuple(skipped_rules),
+    )
 
 
 def apply_deterministic_rules(

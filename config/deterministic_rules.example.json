@@ -1,12 +1,92 @@
 {
     "rules": [
         {
-            "contains": "MUTUO",
+            "contains": "ACC.EMOLUM.(STP.PEN)",
+            "category": "Stipendio"
+        },
+        {
+            "contains": "STIPENDIO",
+            "category": "Stipendio"
+        },
+        {
+            "contains": "COMM.SU BONIFICI",
+            "category": "Conto"
+        },
+        {
+            "contains": "COMMISSIONI BONIFICO",
+            "category": "Conto"
+        },
+        {
+            "contains": "TRASFERIM.TRA CONTI",
+            "category": "Trasferimento"
+        },
+        {
+            "contains": "GIROCONTO",
+            "category": "Trasferimento"
+        },
+        {
+            "contains": "CANONE CONTO",
+            "category": "Conto"
+        },
+        {
+            "contains": "IMPOSTA DI BOLLO",
+            "category": "Conto"
+        },
+        {
+            "contains": "MUTUO N.",
             "category": "Mutuo"
         },
         {
-            "contains": "SUPERMERCATO",
+            "contains": "POLIZZA",
+            "category": "Assicurazioni"
+        },
+        {
+            "contains": "ASSICURAZIONI",
+            "category": "Assicurazioni"
+        },
+        {
+            "contains": "PLANETEL",
+            "category": "Bollette"
+        },
+        {
+            "contains": "ENGIE ITALIA",
+            "category": "Bollette"
+        },
+        {
+            "contains": "A2A SPA",
+            "category": "Bollette"
+        },
+        {
+            "contains": "HERA S.P.A.",
+            "category": "Bollette"
+        },
+        {
+            "contains": "ENEL ENERGIA",
+            "category": "Bollette"
+        },
+        {
+            "contains": "ILIAD",
+            "category": "Bollette"
+        },
+        {
+            "contains": "IPER CONAD",
             "category": "Spesa"
+        },
+        {
+            "contains": "ESSELUNGA",
+            "category": "Spesa"
+        },
+        {
+            "contains": "PAM BERGAMO",
+            "category": "Spesa"
+        },
+        {
+            "contains": "IPER",
+            "category": "Spesa"
+        },
+        {
+            "contains": "ARCAPLANET",
+            "category": "Linus"
         }
     ]
 }

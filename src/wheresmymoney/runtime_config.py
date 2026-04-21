@@ -61,9 +61,9 @@ def _load_dotenv_if_available(env_path: str | Path | None) -> None:
         return
 
     if env_path is None:
-        load_dotenv()
+        load_dotenv(override=True)
     else:
-        load_dotenv(dotenv_path=Path(env_path))
+        load_dotenv(dotenv_path=Path(env_path), override=True)
 
 
 def _require_non_empty_env(value: str | None, env_name: str) -> str:

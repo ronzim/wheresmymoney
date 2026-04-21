@@ -1,273 +1,355 @@
 # Wheresmymoney
 
-## Punto 3 implementato
+Tool CLI per importare estratti conto bancari, categorizzarli con regole + LLM, farli rivedere manualmente e appenderli in modo append-only su Google Sheets.
 
-Il modello dati canonico delle transazioni e' ora definito in codice, con
-validazione esplicita su date, importi, valuta e payload verso Google Sheets.
+## Utilizzo
 
-File introdotti:
+### Obiettivo del tool
 
-- `src/wheresmymoney/models.py`: modello `Transaction` e helper di normalizzazione.
-- `tests/test_models.py`: test unitari sul modello canonico.
+Il flusso operativo e' questo:
 
-Regole fissate nel modello:
+1. leggere un file bancario grezzo
+2. normalizzare i movimenti in un modello unico
+3. caricare le categorie valide dal Google Sheet
+4. applicare regole deterministiche
+5. classificare il resto con Gemini
+6. far revisionare tutto da terminale
+7. appendere solo nuove righe nel tab bancario corretto
 
-- `transaction_date` e `value_date` accettano `dd/mm/yyyy` o `yyyy-mm-dd`
-- `amount` viene normalizzato in un unico valore signed con due decimali
-- `currency` viene normalizzata come codice ISO a 3 lettere
-- `cleaned_description` e `assigned_category` sono opzionali
-- la descrizione esportata verso Google Sheets e' sempre quella originale del file banca, senza modifiche o riassunti
-- `Mese` non puo' comparire nel payload di scrittura verso Sheets
+Il tool non modifica righe esistenti e non scrive mai nei tab di analisi.
 
-## Punto 4 avviato
+### Quick start
 
-La base parser ora supporta due famiglie di export bancario verificate sui file
-campione presenti in `test-data`.
-
-File introdotti:
-
-- `src/wheresmymoney/parsers.py`: autodetect formato e parsing in `Transaction`
-- `tests/test_parsers.py`: test sui file campione reali
-
-Formati coperti:
-
-- `.xlsx` con header strutturato `Data Op.`, `Data Val.`, `Descrizione`, `Importo`, `Div.`
-- `.xlsx` con colonne separate `Addebiti (euro)` e `Accrediti (euro)` da convertire in importo signed
-- `.xls` che in realta' contiene una tabella HTML con `Data Contabile`, `Data Valuta`, `Importo`, `Divisa`, `Causale / Descrizione`
-
-## Punto 5 implementato
-
-La lettura delle categorie dal Google Sheet e' ora codificata nel servizio dedicato.
-
-File introdotti:
-
-- `src/wheresmymoney/categories.py`: lettura e validazione del catalogo categorie
-- `tests/test_categories.py`: test unitari sulla policy delle categorie
-
-Policy adottata:
-
-- si legge solo la prima colonna del foglio `Categorie`
-- si ignora l'intestazione `Categorie`
-- si ignorano righe vuote
-- si trimmano i nomi categoria ai bordi
-- i duplicati fanno fallire il caricamento
-
-Comando utile:
-
-```bash
-uv run wheresmymoney-list-categories
-```
-
-## Punto 6 implementato
-
-Il layer di regole deterministiche prima dell'LLM e' ora disponibile e validato.
-
-File introdotti:
-
-- `src/wheresmymoney/deterministic_rules.py`: caricamento e applicazione delle regole
-- `tests/test_deterministic_rules.py`: test unitari sul motore regole
-
-Comportamento:
-
-- le regole vengono lette da JSON
-- ogni regola usa oggi il criterio `contains`
-- la categoria di ogni regola viene validata contro il catalogo reale categorie
-- il primo match vince
-- i match vengono tracciati con `classification_source = "rule"`
-- le transazioni non matchate restano separate e possono passare all'LLM
-
-## Punto 7 implementato
-
-Il classificatore LLM con output strutturato e fallback locale e' ora disponibile.
-
-File introdotti:
-
-- `src/wheresmymoney/llm_categorizer.py`: prompt, chiamata al modello, parsing JSON e fallback
-- `tests/test_llm_categorizer.py`: test unitari del classificatore
-
-Comportamento:
-
-- il prompt richiede JSON puro con `assigned_category` e `cleaned_description`
-- si passano al modello solo le transazioni gia' rimaste fuori dalle regole deterministiche
-- la risposta viene validata localmente con parser JSON esplicito
-- la categoria viene validata contro il catalogo categorie
-- in caso di JSON invalido o categoria fuori lista si usa `Da Verificare`
-- in fallback `cleaned_description` resta una versione sicura della descrizione originale
-
-## Punto 8 implementato
-
-La CLI interattiva di revisione e' ora disponibile come modulo applicativo testabile.
-
-File introdotti:
-
-- `src/wheresmymoney/review_cli.py`: revisione interattiva riga per riga
-- `tests/test_review_cli.py`: test della CLI con input simulato
-
-Comportamento:
-
-- mostra data, importo, descrizione originale, descrizione pulita e categoria proposta
-- permette di tenere la categoria corrente con Invio
-- permette di cambiare categoria scegliendo un indice dalla lista completa
-- mostra un riepilogo finale di tutte le transazioni prima della conferma
-- permette di riaprire una transazione dal riepilogo finale digitandone l'indice
-- chiede conferma finale prima della scrittura
-- permette annullamento completo senza side effect
-
-## Punto 9 implementato
-
-Il writer append-only verso Google Sheets e' ora implementato con mapping sicuro.
-
-File introdotti:
-
-- `src/wheresmymoney/sheet_writer.py`: writer append-only e integrazione gspread
-- `tests/test_sheet_writer.py`: test unitari su next row, mapping e range di scrittura
-
-Comportamento:
-
-- verifica che il tab sia tra quelli bancari autorizzati
-- legge l'header reale del foglio per decidere il mapping di scrittura
-- se il tab include `Mese`, scrive una formula `=MONTH(Bn)` nelle nuove righe
-- scrive solo righe nuove senza toccare quelle esistenti
-- usa il payload dominio senza includere `Mese` come dato sorgente
-
-## Punto 10 implementato
-
-La pipeline CLI end-to-end ora espone un comando unico con logging ed error handling.
-
-File introdotti:
-
-- `src/wheresmymoney/cli_import.py`: orchestration parse -> categorie -> regole -> LLM -> review -> append
-- `tests/test_cli_import.py`: test end-to-end locale con retry LLM e append simulato
-
-Comportamento:
-
-- aggiunge il comando `uv run wheresmymoney-import`
-- logga parse, caricamento categorie, regole, LLM, review e append
-- gestisce errori parser, config, Google Sheets e writer con messaggi CLI chiari
-- applica retry ragionato alla sola fase LLM in caso di errore esterno
-- supporta `--dry-run` per verificare il flusso senza scrittura
-
-Esempio d'uso:
+Dopo aver configurato l'ambiente:
 
 ```bash
 uv run wheresmymoney-import test-data/ListaMovimenti.xlsx --bank Comune_bpm --dry-run
 ```
 
-## Punto 11 completato
+Questo comando esegue l'intera pipeline senza scrivere sul foglio.
 
-La copertura test ora include anche un'integrazione live controllata su Google Sheets.
-
-File introdotti:
-
-- `tests/test_google_sheet_integration.py`: append reale su foglio di test con verifica post-scrittura
-
-Comportamento:
-
-- il test live e' gated da `WHERESMYMONEY_RUN_LIVE_TESTS=1`
-- usa la pipeline reale fino all'append su un tab bancario autorizzato
-- verifica formula `Mese`, data, importo, categoria e descrizione scritta
-- non tocca i tab di analisi
-
-Esempio d'uso:
+Per una scrittura reale, basta togliere `--dry-run`:
 
 ```bash
-WHERESMYMONEY_RUN_LIVE_TESTS=1 uv run pytest tests/test_google_sheet_integration.py
+uv run wheresmymoney-import test-data/ListaMovimenti.xlsx --bank Comune_bpm
 ```
 
-## Punto 2 implementato
+### Comando principale
 
-Il bootstrap minimo del progetto Python ora include dipendenze, loader della
-configurazione runtime e smoke test CLI.
+```bash
+uv run wheresmymoney-import <file_path> --bank <tab_bancario> [--dry-run] [--llm-attempts N]
+```
 
-File introdotti:
+Parametri principali:
 
-- `pyproject.toml`: metadati progetto e dipendenze gestite con `uv`.
-- `.gitignore`: esclusione di `.venv`, `.env` e cache locali.
-- `.env.example`: variabili ambiente richieste.
-- `src/wheresmymoney/__init__.py`: inizializzazione package.
-- `src/wheresmymoney/runtime_config.py`: loader e validazione della runtime config.
-- `scripts/smoke_test.py`: smoke test per config locale, Google Sheets e Gemini.
+- `file_path`: file bancario da importare
+- `--bank`: nome del tab bancario di destinazione, che identifica anche la sorgente logica
+- `--dry-run`: esegue parse, categorizzazione e review senza append finale
+- `--llm-attempts`: numero massimo di retry per singola transazione in caso di errore esterno LLM
 
-Note aggiornate:
+### Esempi pratici
 
-- l'integrazione Gemini usa `google.genai`, non piu' `google-generativeai`
-- il modello verificato in questo progetto e' `gemini-2.5-flash`
+Validare solo la configurazione del foglio:
 
-Esempio d'uso:
+```bash
+uv run wheresmymoney-validate-config config/target_sheet.example.json --tab Comune_bpm
+```
+
+Verificare accesso a config, Google Sheets e Gemini:
+
+```bash
+uv run wheresmymoney-smoke-test --config-only
+uv run wheresmymoney-smoke-test
+```
+
+Stampare le categorie lette dal foglio:
+
+```bash
+uv run wheresmymoney-list-categories
+```
+
+Import reale con review interattiva:
+
+```bash
+uv run wheresmymoney-import test-data/movimentiConto-1.xls --bank Comune_bpm
+```
+
+### Review CLI
+
+Durante la review il tool:
+
+- mostra ogni transazione con data, importo, descrizione originale, descrizione pulita e categoria proposta
+- usa una selezione interattiva nel terminale con frecce e invio quando l'ambiente e' TTY compatibile
+- permette di tenere la categoria corrente o sostituirla scegliendola da una lista navigabile
+- mostra un riepilogo finale completo prima della conferma
+- permette di riaprire una transazione dal riepilogo finale scegliendola da un menu finale
+- permette di confermare o annullare l'append finale
+
+Se il terminale non supporta la UI interattiva oppure la libreria non e' disponibile, il tool mantiene automaticamente il fallback testuale gia' esistente.
+
+### Garanzie operative
+
+- la descrizione scritta su Google Sheets e' sempre quella originale del file banca
+- la colonna `Mese` non viene presa dai dati sorgente
+- se il tab usa `Mese` come formula in colonna A, il writer scrive `=MONTH(Bn)` nelle nuove righe
+- i tab protetti come `Categorie` e `Andamento` non sono scrivibili
+- in caso di errore LLM persistente, la transazione degrada in modo sicuro a `Da Verificare`
+
+### Formati bancari attualmente coperti
+
+- `.xlsx` con header strutturato `Data Op.`, `Data Val.`, `Descrizione`, `Importo`, `Div.`
+- `.xlsx` con colonne separate `Addebiti (euro)` e `Accrediti (euro)`
+- `.xls` che contiene una tabella HTML con `Data Contabile`, `Data Valuta`, `Importo`, `Divisa`, `Causale / Descrizione`
+
+## Ambiente Di Sviluppo
+
+### Requisiti
+
+- Python 3.10+
+- `uv`
+- un file JSON di Service Account Google condiviso come Editor sul foglio target
+- una Gemini API key valida
+
+### Setup iniziale
 
 ```bash
 uv venv
 source .venv/bin/activate
 uv sync
 cp .env.example .env
-uv run wheresmymoney-validate-config config/target_sheet.example.json --tab Comune_bpm
-uv run wheresmymoney-smoke-test --config-only
-uv run wheresmymoney-smoke-test
 ```
 
-Compatibilita' temporanea:
+### Variabili ambiente
 
-- restano disponibili anche `python3 scripts/validate_target_config.py` e
-  `python3 scripts/smoke_test.py`, ma i comandi consigliati diventano quelli via
-  `uv run`.
-
-Configurazione variabili ambiente:
-
-1. `GOOGLE_SERVICE_ACCOUNT_JSON`
-   Inserisci il path locale del file JSON del Service Account Google.
-   Esempio: `/home/ronzim/secrets/wheresmymoney-service-account.json`
-
-2. `GEMINI_API_KEY`
-   Inserisci la chiave API ottenuta da Google AI Studio.
-
-3. `TARGET_SHEET_CONFIG`
-   Punta al file JSON della configurazione foglio. Nel tuo caso attuale puo'
-   restare `config/target_sheet.example.json` finche' non vuoi rinominarlo.
-
-4. `GEMINI_MODEL`
-   Usa `gemini-2.5-flash`, che e' stato verificato con lo smoke test reale.
-
-Esempio di `.env` reale:
+Il file `.env.example` contiene:
 
 ```dotenv
-GOOGLE_SERVICE_ACCOUNT_JSON=/home/ronzim/secrets/wheresmymoney-service-account.json
-GEMINI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
+GOOGLE_SERVICE_ACCOUNT_JSON=/absolute/path/to/service-account.json
+GEMINI_API_KEY=your_gemini_api_key
 TARGET_SHEET_CONFIG=config/target_sheet.example.json
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Nota pratica:
+Significato:
 
-- `uv` e' gia' stato installato e validato in questo ambiente.
+1. `GOOGLE_SERVICE_ACCOUNT_JSON`
+   Path locale al file JSON del Service Account Google.
 
-## Punto 1 implementato
+2. `GEMINI_API_KEY`
+   API key Gemini generata da Google AI Studio.
 
-Il primo punto della checklist e' stato materializzato con una configurazione
-centralizzata del foglio target e un validator locale.
+3. `TARGET_SHEET_CONFIG`
+   Path alla configurazione JSON del foglio target.
 
-File introdotti:
+4. `GEMINI_MODEL`
+   Modello Gemini usato dalla pipeline. Quello verificato in questo progetto e' `gemini-2.5-flash`.
 
-- `config/target_sheet.example.json`: template della configurazione da completare.
-- `src/wheresmymoney/target_config.py`: modello e validazione dei vincoli.
-- `scripts/validate_target_config.py`: controllo da terminale della configurazione.
+### Configurazione del foglio target
 
-Nota:
+La configurazione principale vive in `config/target_sheet.example.json` e definisce:
 
-- `protected_analysis_tabs` rappresenta di fatto tutti i tab non scrivibili dal processo.
-- In questo insieme possono rientrare sia tab di analisi sia tab di supporto come `Categorie`.
-
-Esempio d'uso:
-
-```bash
-python scripts/validate_target_config.py
-python scripts/validate_target_config.py --tab comune_bpm
-```
+- `spreadsheet_id`
+- `categories_sheet_name`
+- `allowed_bank_tabs`
+- `protected_analysis_tabs`
+- `transaction_start_row`
+- `bank_tab_columns`
+- `deterministic_rules_path`
 
 Vincoli validati:
 
 - il foglio categorie non puo' coincidere con un tab bancario
 - un tab non puo' essere insieme consentito e protetto
 - i tab protetti non sono scrivibili
-- il tab scelto deve essere presente tra i tab bancari consentiti
+- il tab scelto deve comparire tra i tab bancari autorizzati
 - la riga iniziale delle transazioni deve essere positiva
-- l'ordine delle colonne del tab bancario deve essere esplicito
+- l'ordine colonne di output deve essere esplicito
+
+### Configurazione delle regole deterministiche
+
+Le regole deterministiche sono configurate tramite il campo `deterministic_rules_path` dentro `config/target_sheet.example.json`.
+
+Il file di esempio attuale e' `config/deterministic_rules.example.json`.
+
+Formato supportato:
+
+```json
+{
+  "rules": [
+    {
+      "contains": "MUTUO",
+      "category": "Mutuo"
+    },
+    {
+      "contains": "SUPERMERCATO",
+      "category": "Spesa"
+    }
+  ]
+}
+```
+
+Significato dei campi:
+
+1. `rules`
+   Lista ordinata di regole.
+
+2. `contains`
+   Sottostringa cercata nella `original_description` della transazione.
+
+3. `category`
+   Categoria da assegnare se la regola matcha.
+
+Comportamento del motore:
+
+- il match e' case-insensitive
+- il primo match vince
+- se nessuna regola matcha, la transazione passa al classificatore LLM
+- la categoria deve esistere nel catalogo reale letto dal foglio `Categorie`
+- condizioni duplicate fanno fallire il caricamento della configurazione
+
+Indicazioni pratiche:
+
+- usa regole solo per pattern molto stabili e ricorrenti
+- preferisci descrizioni abbastanza specifiche da evitare falsi positivi
+- tieni le regole piu' specifiche prima di quelle piu' generiche
+- dopo ogni modifica, verifica il comportamento con un import in `--dry-run`
+
+### Dipendenze principali
+
+Il progetto usa:
+
+- `gspread`
+- `google-genai`
+- `openpyxl`
+- `pandas`
+- `python-dotenv`
+- `pytest`
+
+### Test
+
+Test unitari principali:
+
+```bash
+uv run pytest
+```
+
+Test live di integrazione Google Sheets:
+
+```bash
+WHERESMYMONEY_RUN_LIVE_TESTS=1 uv run pytest tests/test_google_sheet_integration.py
+```
+
+Questo test fa un append reale sul foglio di test e verifica subito dopo la riga scritta.
+
+### Note per lo sviluppo
+
+- i comandi consigliati sono quelli via `uv run`
+- restano disponibili anche alcuni wrapper in `scripts/`, ma sono solo compatibilita' temporanea
+- il progetto e' pensato per essere usato prima in `--dry-run`, poi in append reale
+
+## Recap Implementazione
+
+### Punto 1
+
+Configurazione centralizzata del foglio target e validator locale.
+
+File principali:
+
+- `config/target_sheet.example.json`
+- `src/wheresmymoney/target_config.py`
+- `scripts/validate_target_config.py`
+
+### Punto 2
+
+Bootstrap del progetto Python, configurazione runtime e smoke test.
+
+File principali:
+
+- `pyproject.toml`
+- `.env.example`
+- `src/wheresmymoney/runtime_config.py`
+- `src/wheresmymoney/cli_smoke_test.py`
+
+### Punto 3
+
+Modello dati canonico `Transaction` con validazione di date, importi, valuta e export verso Sheets.
+
+File principali:
+
+- `src/wheresmymoney/models.py`
+- `tests/test_models.py`
+
+### Punto 4
+
+Parser per i formati bancari reali attualmente supportati.
+
+File principali:
+
+- `src/wheresmymoney/parsers.py`
+- `tests/test_parsers.py`
+
+### Punto 5
+
+Lettura e validazione dinamica delle categorie dal foglio `Categorie`.
+
+File principali:
+
+- `src/wheresmymoney/categories.py`
+- `tests/test_categories.py`
+
+### Punto 6
+
+Layer di regole deterministiche prima dell'LLM.
+
+File principali:
+
+- `src/wheresmymoney/deterministic_rules.py`
+- `tests/test_deterministic_rules.py`
+
+### Punto 7
+
+Classificatore LLM con output JSON strutturato e fallback locale sicuro.
+
+File principali:
+
+- `src/wheresmymoney/llm_categorizer.py`
+- `tests/test_llm_categorizer.py`
+
+### Punto 8
+
+Review CLI interattiva con riepilogo finale e riapertura per indice.
+
+File principali:
+
+- `src/wheresmymoney/review_cli.py`
+- `tests/test_review_cli.py`
+
+### Punto 9
+
+Writer append-only verso Google Sheets con preservazione della logica `Mese`.
+
+File principali:
+
+- `src/wheresmymoney/sheet_writer.py`
+- `tests/test_sheet_writer.py`
+
+### Punto 10
+
+Pipeline end-to-end con logging, error handling e comando unico CLI.
+
+File principali:
+
+- `src/wheresmymoney/cli_import.py`
+- `tests/test_cli_import.py`
+
+### Punto 11
+
+Copertura test con integrazione live controllata su Google Sheets.
+
+File principali:
+
+- `tests/test_google_sheet_integration.py`
+
+### Stato attuale
+
+Il MVP CLI append-only e' implementato, testato localmente e verificato anche con test live sul foglio Google di prova.

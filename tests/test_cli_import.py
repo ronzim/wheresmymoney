@@ -5,9 +5,16 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 from wheresmymoney.categories import build_category_catalog
-from wheresmymoney.cli_import import run_import_pipeline
-from wheresmymoney.deterministic_rules import DeterministicRule, RuleApplication, RuleApplicationBatch
+from wheresmymoney.cli_import import _format_import_error, run_import_pipeline
+from wheresmymoney.deterministic_rules import (
+    DeterministicRule,
+    DeterministicRuleError,
+    RuleApplication,
+    RuleApplicationBatch,
+)
 from wheresmymoney.llm_categorizer import LLMCategorization, LLMCategorizationBatch
 from wheresmymoney.models import Transaction
 from wheresmymoney.runtime_config import RuntimeConfig
@@ -306,3 +313,101 @@ def test_run_import_pipeline_falls_back_when_llm_is_still_unavailable() -> None:
     assert result.confirmed is True
     assert reviewed_transactions[0][0].assigned_category == "Da Verificare"
     assert reviewed_transactions[0][0].cleaned_description == "fornitore sconosciuto"
+
+
+def test_run_import_pipeline_fails_on_rules_with_unknown_live_categories(tmp_path: Path) -> None:
+    rules_path = tmp_path / "rules.json"
+    rules_path.write_text(
+        '{"rules": ['
+        '{"contains": "CASHBACK", "category": "Rimborsi"},'
+        '{"contains": "STIPENDIO", "category": "Entrate"}'
+        ']}'
+    )
+    original_transactions = (_transaction("stipendio aprile", "2000,00"),)
+
+    target = TargetSheetConfig.from_dict(
+        {
+            "spreadsheet_id": "sheet-id",
+            "categories_sheet_name": "Categorie",
+            "allowed_bank_tabs": ["Comune_bpm"],
+            "protected_analysis_tabs": ["Categorie", "Andamento"],
+            "transaction_start_row": 16,
+            "bank_tab_columns": [
+                "Data Valuta",
+                "Importo",
+                "Divisa",
+                "Cat",
+                "Descrizione",
+            ],
+            "deterministic_rules_path": str(rules_path),
+        }
+    )
+    catalog = build_category_catalog(["Categorie", "Entrate"], header_name="Categorie")
+
+    def parse_statement_func(_file_path: str | Path, _source_bank: str) -> DummyParsedStatement:
+        return DummyParsedStatement(
+            source_bank="Comune_bpm",
+            transactions=original_transactions,
+            parser_name="fake_parser",
+        )
+
+    def load_categories_func(_runtime: RuntimeConfig, _target: TargetSheetConfig):
+        return catalog
+
+    def categorize_func(_transactions, _catalog, _runtime):
+        return LLMCategorizationBatch(classified=())
+
+    def review_func(transactions, _catalog, **_kwargs):
+        class Result:
+            reviewed_transactions = tuple(transactions)
+            confirmed = False
+
+        return Result()
+
+    with pytest.raises(
+        DeterministicRuleError,
+        match=r"contains='CASHBACK', category='Rimborsi'",
+    ):
+        run_import_pipeline(
+            "dummy.xlsx",
+            "Comune_bpm",
+            dry_run=True,
+            runtime_config=_runtime(),
+            target_config=target,
+            parse_statement_func=parse_statement_func,
+            load_categories_func=load_categories_func,
+            categorize_func=categorize_func,
+            review_func=review_func,
+            output_func=lambda _message: None,
+        )
+
+
+def test_format_import_error_prints_sorted_categories_one_per_line() -> None:
+    error = DeterministicRuleError(
+        "Unknown category in deterministic rule: contains='CASHBACK', category='Rimborsi'",
+        available_categories=("spesa", "Animali", "Entrate"),
+    )
+
+    rendered = _format_import_error(error, use_color=False)
+
+    assert rendered == (
+        "Import fallito: Unknown category in deterministic rule: "
+        "contains='CASHBACK', category='Rimborsi'\n"
+        "Categorie disponibili nel foglio:\n"
+        "- Animali\n"
+        "- Entrate\n"
+        "- spesa"
+    )
+
+
+def test_format_import_error_alternates_colors_for_categories() -> None:
+    error = DeterministicRuleError(
+        "Unknown category in deterministic rule: contains='CASHBACK', category='Rimborsi'",
+        available_categories=("Entrate", "Animali", "Spesa"),
+    )
+
+    rendered = _format_import_error(error, use_color=True)
+
+    assert "\033[96m- Animali\033[0m" in rendered
+    assert "\033[93m- Entrate\033[0m" in rendered
+    assert "\033[96m- Spesa\033[0m" in rendered

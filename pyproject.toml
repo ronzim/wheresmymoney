@@ -9,11 +9,13 @@ description = "Import and categorize bank statements into Google Sheets."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "click",
   "gspread",
   "google-genai",
   "openpyxl",
   "pandas",
   "python-dotenv",
+  "questionary",
 ]
 
 [project.scripts]

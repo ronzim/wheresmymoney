@@ -34,7 +34,10 @@ def test_load_deterministic_rules_rejects_unknown_category(tmp_path: Path) -> No
     )
     catalog = build_category_catalog(["Categorie", "Mutuo"], header_name="Categorie")
 
-    with pytest.raises(DeterministicRuleError):
+    with pytest.raises(
+        DeterministicRuleError,
+        match=r"contains='MUTUO', category='NonEsiste'",
+    ):
         load_deterministic_rules(rules_path, catalog)
 
 
