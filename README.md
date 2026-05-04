@@ -95,6 +95,8 @@ Se il terminale non supporta la UI interattiva oppure la libreria non e' disponi
 - i tab protetti come `Categorie` e `Andamento` non sono scrivibili
 - le transazioni non coperte da regole vengono inviate a Gemini in batch, per ridurre numero di chiamate, latenza e costo
 - in caso di errore LLM persistente, la transazione degrada in modo sicuro a `Da Verificare`
+- dopo la classificazione automatica e dopo ogni transazione revisionata, il tool salva un checkpoint locale per poter riprendere la review senza rifare parse, regole e chiamate LLM
+- il checkpoint locale viene eliminato solo dopo un append riuscito su Google Sheets
 
 ### Formati bancari attualmente coperti
 
@@ -130,6 +132,7 @@ GEMINI_API_KEY=your_gemini_api_key
 TARGET_SHEET_CONFIG=config/target_sheet.example.json
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_BATCH_SIZE=20
+WHERESMYMONEY_CHECKPOINT_DIR=.wheresmymoney-checkpoints
 ```
 
 Significato:
@@ -149,13 +152,19 @@ Significato:
 5. `GEMINI_BATCH_SIZE`
    Numero di transazioni inviate a Gemini per singola chiamata. Deve essere un intero positivo. Se non lo imposti, il default e' `20`.
 
-Per impostarla, aggiungi o modifica questa riga nel file `.env`:
+6. `WHERESMYMONEY_CHECKPOINT_DIR`
+   Directory locale dove il tool salva i checkpoint della review per poter riprendere senza rifare la classificazione. Se non la imposti, il default e' `.wheresmymoney-checkpoints`.
+
+Per impostarle, aggiungi o modifica queste righe nel file `.env`:
 
 ```dotenv
 GEMINI_BATCH_SIZE=20
+WHERESMYMONEY_CHECKPOINT_DIR=.wheresmymoney-checkpoints
 ```
 
-Valori piu' alti riducono il numero di chiamate ma aumentano la dimensione del prompt. Valori piu' bassi riducono il payload per richiesta ma aumentano il numero di chiamate.
+Valori piu' alti di `GEMINI_BATCH_SIZE` riducono il numero di chiamate ma aumentano la dimensione del prompt. Valori piu' bassi riducono il payload per richiesta ma aumentano il numero di chiamate.
+
+Se interrompi il processo durante la review, al prossimo avvio dello stesso import il tool riparte automaticamente dall'ultima transazione gia' revisionata trovando il checkpoint in questa directory.
 
 ### Configurazione del foglio target
 

@@ -12,6 +12,7 @@ class RuntimeConfigError(ValueError):
 DEFAULT_TARGET_CONFIG_PATH = "config/target_sheet.example.json"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_GEMINI_BATCH_SIZE = 20
+DEFAULT_CHECKPOINT_DIR = ".wheresmymoney-checkpoints"
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class RuntimeConfig:
     target_sheet_config_path: Path
     gemini_model: str = DEFAULT_GEMINI_MODEL
     gemini_batch_size: int = DEFAULT_GEMINI_BATCH_SIZE
+    checkpoint_dir: Path = Path(DEFAULT_CHECKPOINT_DIR)
 
     @classmethod
     def from_env(
@@ -51,6 +53,9 @@ class RuntimeConfig:
             "GEMINI_BATCH_SIZE",
             default=DEFAULT_GEMINI_BATCH_SIZE,
         )
+        checkpoint_dir = Path(
+            os.getenv("WHERESMYMONEY_CHECKPOINT_DIR", DEFAULT_CHECKPOINT_DIR)
+        )
 
         return cls(
             google_service_account_json=google_credentials,
@@ -58,6 +63,7 @@ class RuntimeConfig:
             target_sheet_config_path=target_sheet_config_path,
             gemini_model=gemini_model,
             gemini_batch_size=gemini_batch_size,
+            checkpoint_dir=checkpoint_dir,
         )
 
 

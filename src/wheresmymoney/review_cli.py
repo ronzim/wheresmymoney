@@ -78,6 +78,8 @@ def review_transactions_interactively(
     transactions: list[Transaction] | tuple[Transaction, ...],
     category_catalog: CategoryCatalog,
     *,
+    initial_reviewed_count: int = 0,
+    on_review_progress: Callable[[tuple[Transaction, ...], int], None] | None = None,
     input_func: Callable[[str], str] = input,
     output_func: Callable[[str], None] = print,
     prompt_ui: PromptUI | None = None,
@@ -87,13 +89,19 @@ def review_transactions_interactively(
         input_func=input_func,
         output_func=output_func,
     )
-    reviewed_transactions: list[Transaction] = []
+    reviewed_transactions = list(transactions[:initial_reviewed_count])
+
+    if initial_reviewed_count < 0 or initial_reviewed_count > len(transactions):
+        raise ReviewCLIError("initial_reviewed_count is out of bounds")
 
     try:
-        for index, transaction in enumerate(transactions, start=1):
+        for offset, transaction in enumerate(
+            transactions[initial_reviewed_count:],
+            start=initial_reviewed_count + 1,
+        ):
             reviewed_transactions.append(
                 _review_single_transaction(
-                    index,
+                    offset,
                     len(transactions),
                     transaction,
                     category_catalog,
@@ -103,6 +111,8 @@ def review_transactions_interactively(
                     styler=styler,
                 )
             )
+            if on_review_progress is not None:
+                on_review_progress(tuple(reviewed_transactions), len(reviewed_transactions))
 
         finalized_transactions, confirmed = _finalize_review(
             reviewed_transactions,
@@ -111,6 +121,7 @@ def review_transactions_interactively(
             output_func=output_func,
             prompt_ui=effective_prompt_ui,
             styler=styler,
+            on_review_progress=on_review_progress,
         )
     except ReviewCLIError:
         output_func("Operazione annullata. Nessuna scrittura verra' eseguita.")
@@ -403,6 +414,7 @@ def _finalize_review(
     output_func: Callable[[str], None],
     prompt_ui: PromptUI | None,
     styler: ReviewStyler,
+    on_review_progress: Callable[[tuple[Transaction, ...], int], None] | None,
 ) -> tuple[list[Transaction], bool]:
     while True:
         _print_review_summary(
@@ -452,6 +464,11 @@ def _finalize_review(
                     styler=styler,
                 )
             )
+            if on_review_progress is not None:
+                on_review_progress(
+                    tuple(reviewed_transactions),
+                    len(reviewed_transactions),
+                )
             continue
 
         answer = input_func(
@@ -474,6 +491,11 @@ def _finalize_review(
                         styler=styler,
                     )
                 )
+                if on_review_progress is not None:
+                    on_review_progress(
+                        tuple(reviewed_transactions),
+                        len(reviewed_transactions),
+                    )
                 continue
             output_func(
                 "Indice non valido. Scegli un numero presente nel riepilogo."

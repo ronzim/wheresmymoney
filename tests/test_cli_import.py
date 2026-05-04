@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from tempfile import mkdtemp
 
 import pytest
 
@@ -35,6 +36,7 @@ def _runtime() -> RuntimeConfig:
         gemini_api_key="test-key",
         target_sheet_config_path=Path("config/target_sheet.example.json"),
         gemini_model="gemini-2.5-flash",
+        checkpoint_dir=Path(mkdtemp(prefix="wmm-test-checkpoints-")),
     )
 
 
@@ -258,6 +260,287 @@ def test_run_import_pipeline_appends_after_confirmation() -> None:
     assert len(append_calls) == 1
     assert append_calls[0][2] == "Comune_bpm"
     assert append_calls[0][3][0].assigned_category == "Salute"
+
+
+def test_run_import_pipeline_reports_checkpoint_resume() -> None:
+    original_transactions = (_transaction("pagamento palestra", "-49,90"),)
+    catalog = build_category_catalog(["Categorie", "Salute"], header_name="Categorie")
+    captured_outputs: list[str] = []
+
+    def parse_statement_func(_file_path: str | Path, _source_bank: str) -> DummyParsedStatement:
+        return DummyParsedStatement(
+            source_bank="Comune_bpm",
+            transactions=original_transactions,
+            parser_name="fake_parser",
+        )
+
+    def load_categories_func(_runtime: RuntimeConfig, _target: TargetSheetConfig):
+        return catalog
+
+    def load_rules_func(_file_path: str | Path, _catalog):
+        return ()
+
+    def apply_rules_func(transactions, _rules):
+        return RuleApplicationBatch(classified=(), unmatched=tuple(transactions))
+
+    def categorize_func(transactions, _catalog, _runtime):
+        return LLMCategorizationBatch(
+            classified=(
+                LLMCategorization(
+                    transaction=Transaction(
+                        source_bank="Comune_bpm",
+                        transaction_date=date(2026, 4, 21),
+                        value_date=date(2026, 4, 21),
+                        amount=Decimal("-49.90"),
+                        currency="EUR",
+                        original_description=transactions[0].original_description,
+                        cleaned_description="Palestra",
+                        assigned_category="Salute",
+                    ),
+                    classification_source="llm",
+                    raw_response="{}",
+                ),
+            )
+        )
+
+    def review_func(transactions, _catalog, **_kwargs):
+        class Result:
+            reviewed_transactions = tuple(transactions)
+            confirmed = True
+
+        return Result()
+
+    def append_func(_runtime, _target, bank, reviewed_transactions):
+        return AppendResult(
+            worksheet_title=bank,
+            start_row=42,
+            row_count=0,
+            updated_range="",
+            skipped_existing_count=len(reviewed_transactions),
+        )
+
+    result = run_import_pipeline(
+        "dummy.xlsx",
+        "Comune_bpm",
+        runtime_config=_runtime(),
+        target_config=_target(),
+        parse_statement_func=parse_statement_func,
+        load_categories_func=load_categories_func,
+        load_rules_func=load_rules_func,
+        apply_rules_func=apply_rules_func,
+        categorize_func=categorize_func,
+        review_func=review_func,
+        append_func=append_func,
+        output_func=captured_outputs.append,
+    )
+
+    assert result.confirmed is True
+    assert captured_outputs[-2] == (
+        "Checkpoint rilevato: 1 transazioni gia' presenti su Comune_bpm."
+    )
+    assert captured_outputs[-1] == (
+        "Ripresa completata: nessuna nuova riga da scrivere su Comune_bpm."
+    )
+
+
+def test_run_import_pipeline_checkpoint_preserves_unreviewed_transactions(
+    tmp_path: Path,
+) -> None:
+    """Verifica che il checkpoint salvi sempre tutte le transazioni (revisionate +
+    rimanenti), non solo quelle già viste. Riproduce il bug per cui dopo un'interruzione
+    a 2/5 il checkpoint riportava 2/2, perdendo le ultime 3."""
+    runtime = RuntimeConfig(
+        google_service_account_json=Path("config/service-account-google.json"),
+        gemini_api_key="test-key",
+        target_sheet_config_path=Path("config/target_sheet.example.json"),
+        gemini_model="gemini-2.5-flash",
+        checkpoint_dir=tmp_path / "checkpoints",
+    )
+    target = _target()
+    saved_checkpoints: list[tuple[tuple[Transaction, ...], int]] = []
+
+    original_transactions = tuple(
+        _transaction(f"movimento {i}", f"-{i*10},00") for i in range(1, 6)
+    )
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa"],
+        header_name="Categorie",
+    )
+
+    def parse_statement_func(_file_path: str | Path, _source_bank: str) -> DummyParsedStatement:
+        return DummyParsedStatement(
+            source_bank="Comune_bpm",
+            transactions=original_transactions,
+            parser_name="fake_parser",
+        )
+
+    def load_categories_func(_runtime: RuntimeConfig, _target: TargetSheetConfig):
+        return catalog
+
+    def load_rules_func(_file_path: str | Path, _catalog):
+        return ()
+
+    def apply_rules_func(transactions, _rules):
+        return RuleApplicationBatch(classified=(), unmatched=tuple(transactions))
+
+    def categorize_func(transactions, _catalog, _runtime):
+        return LLMCategorizationBatch(
+            classified=tuple(
+                LLMCategorization(
+                    transaction=Transaction(
+                        source_bank="Comune_bpm",
+                        transaction_date=date(2026, 4, 21),
+                        value_date=date(2026, 4, 21),
+                        amount=t.amount,
+                        currency="EUR",
+                        original_description=t.original_description,
+                        assigned_category="Spesa",
+                    ),
+                    classification_source="llm",
+                    raw_response="{}",
+                )
+                for t in transactions
+            )
+        )
+
+    progress_calls: list[tuple[tuple[Transaction, ...], int]] = []
+
+    def review_func(transactions, _catalog, **kwargs):
+        on_progress = kwargs.get("on_review_progress")
+        initial = kwargs.get("initial_reviewed_count", 0)
+        # simula revisione di 2 transazioni e poi interruzione
+        reviewed: list[Transaction] = list(transactions[:initial])
+        for offset in range(initial, min(initial + 2, len(transactions))):
+            reviewed.append(transactions[offset])
+            if on_progress:
+                on_progress(tuple(reviewed), len(reviewed))
+                progress_calls.append((tuple(reviewed), len(reviewed)))
+
+        class Result:
+            reviewed_transactions = tuple(reviewed)
+            confirmed = False
+
+        return Result()
+
+    run_import_pipeline(
+        "dummy.xlsx",
+        "Comune_bpm",
+        runtime_config=runtime,
+        target_config=target,
+        parse_statement_func=parse_statement_func,
+        load_categories_func=load_categories_func,
+        load_rules_func=load_rules_func,
+        apply_rules_func=apply_rules_func,
+        categorize_func=categorize_func,
+        review_func=review_func,
+        append_func=lambda *_args, **_kwargs: None,
+        output_func=lambda _message: None,
+    )
+
+    # il checkpoint deve avere TUTTE e 5 le transazioni, non solo le 2 viste
+    from wheresmymoney.import_checkpoint import load_import_checkpoint
+    cp = load_import_checkpoint(runtime.checkpoint_dir, "dummy.xlsx", "Comune_bpm")
+    assert cp is not None
+    assert len(cp.transactions) == 5
+    assert cp.reviewed_count == 2
+    # le prime 2 sono revisionate, le ultime 3 mantengono le categorie automatiche
+    assert all(t.assigned_category is not None for t in cp.transactions)
+
+
+def test_run_import_pipeline_resumes_from_local_checkpoint(tmp_path: Path) -> None:
+    runtime = RuntimeConfig(
+        google_service_account_json=Path("config/service-account-google.json"),
+        gemini_api_key="test-key",
+        target_sheet_config_path=Path("config/target_sheet.example.json"),
+        gemini_model="gemini-2.5-flash",
+        checkpoint_dir=tmp_path / "checkpoints",
+    )
+    target = _target()
+    captured_outputs: list[str] = []
+    reviewed_inputs: list[tuple[Transaction, ...]] = []
+    reviewed_counts: list[int] = []
+    checkpoint_transactions = (
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="21/04/2026",
+            value_date="21/04/2026",
+            amount="-10,00",
+            currency="EUR",
+            original_description="gia classificata",
+            assigned_category="Spesa",
+        ),
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="22/04/2026",
+            value_date="22/04/2026",
+            amount="-20,00",
+            currency="EUR",
+            original_description="ancora da rivedere",
+            assigned_category="Spesa",
+        ),
+    )
+
+    from wheresmymoney.import_checkpoint import ImportCheckpoint, save_import_checkpoint
+
+    save_import_checkpoint(
+        runtime.checkpoint_dir,
+        ImportCheckpoint(
+            file_path=str((tmp_path / "dummy.xlsx").resolve()),
+            source_bank="Comune_bpm",
+            parser_name="fake_parser",
+            rule_classified_count=1,
+            llm_classified_count=1,
+            reviewed_count=1,
+            transactions=checkpoint_transactions,
+        ),
+    )
+
+    def parse_statement_func(_file_path: str | Path, _source_bank: str) -> DummyParsedStatement:
+        raise AssertionError("parse_statement_func must not be called when resuming")
+
+    def load_categories_func(_runtime: RuntimeConfig, _target: TargetSheetConfig):
+        return build_category_catalog(["Categorie", "Spesa"], header_name="Categorie")
+
+    def load_rules_func(_file_path: str | Path, _catalog):
+        raise AssertionError("load_rules_func must not be called when resuming")
+
+    def apply_rules_func(_transactions, _rules):
+        raise AssertionError("apply_rules_func must not be called when resuming")
+
+    def categorize_func(_transactions, _catalog, _runtime):
+        raise AssertionError("categorize_func must not be called when resuming")
+
+    def review_func(transactions, _catalog, **kwargs):
+        reviewed_inputs.append(tuple(transactions))
+        reviewed_counts.append(kwargs["initial_reviewed_count"])
+
+        class Result:
+            reviewed_transactions = tuple(transactions)
+            confirmed = False
+
+        return Result()
+
+    result = run_import_pipeline(
+        tmp_path / "dummy.xlsx",
+        "Comune_bpm",
+        runtime_config=runtime,
+        target_config=target,
+        parse_statement_func=parse_statement_func,
+        load_categories_func=load_categories_func,
+        load_rules_func=load_rules_func,
+        apply_rules_func=apply_rules_func,
+        categorize_func=categorize_func,
+        review_func=review_func,
+        append_func=lambda *_args, **_kwargs: None,
+        output_func=captured_outputs.append,
+    )
+
+    assert result.confirmed is False
+    assert reviewed_counts == [1]
+    assert reviewed_inputs == [checkpoint_transactions]
+    assert captured_outputs[0] == (
+        "Checkpoint locale trovato: ripresa review da 1/2 transazioni."
+    )
 
 
 def test_run_import_pipeline_passes_all_unmatched_transactions_to_llm_once() -> None:

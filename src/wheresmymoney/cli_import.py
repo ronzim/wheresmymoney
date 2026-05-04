@@ -18,6 +18,13 @@ from wheresmymoney.deterministic_rules import (
     apply_deterministic_rules,
     load_deterministic_rules,
 )
+from wheresmymoney.import_checkpoint import (
+    ImportCheckpoint,
+    ImportCheckpointError,
+    delete_import_checkpoint,
+    load_import_checkpoint,
+    save_import_checkpoint,
+)
 from wheresmymoney.llm_categorizer import FALLBACK_CATEGORY, LLMCategorization, LLMCategorizationBatch, categorize_transactions_with_llm
 from wheresmymoney.models import Transaction
 from wheresmymoney.parsers import ParsedStatement, ParserError, parse_statement
@@ -68,60 +75,97 @@ def run_import_pipeline(
     target = target_config or TargetSheetConfig.from_file(runtime.target_sheet_config_path)
 
     LOGGER.info("Starting import", extra={"file_path": str(file_path), "source_bank": source_bank})
-    parsed_statement = parse_statement_func(file_path, source_bank)
-    LOGGER.info(
-        "Parsing completed",
-        extra={
-            "parser_name": parsed_statement.parser_name,
-            "transaction_count": len(parsed_statement.transactions),
-        },
-    )
-    output_func(
-        f"Parsing completato: {len(parsed_statement.transactions)} movimenti con parser {parsed_statement.parser_name}."
-    )
-
+    checkpoint = load_import_checkpoint(runtime.checkpoint_dir, file_path, source_bank)
     category_catalog = load_categories_func(runtime, target)
     LOGGER.info("Categories loaded", extra={"category_count": len(category_catalog.categories)})
 
-    rules = _load_rules(target, runtime, category_catalog, load_rules_func)
-    rule_batch = apply_rules_func(parsed_statement.transactions, rules)
-    LOGGER.info(
-        "Deterministic rules applied",
-        extra={
-            "matched_count": len(rule_batch.classified),
-            "unmatched_count": len(rule_batch.unmatched),
-        },
-    )
+    if checkpoint is not None:
+        parsed_statement = _build_checkpoint_parsed_statement(checkpoint, source_bank)
+        classified_transactions = checkpoint.transactions
+        rule_classified_count = checkpoint.rule_classified_count
+        llm_classified_count = checkpoint.llm_classified_count
+        initial_reviewed_count = checkpoint.reviewed_count
+        output_func(
+            "Checkpoint locale trovato: ripresa review da "
+            f"{initial_reviewed_count}/{len(classified_transactions)} transazioni."
+        )
+    else:
+        parsed_statement = parse_statement_func(file_path, source_bank)
+        LOGGER.info(
+            "Parsing completed",
+            extra={
+                "parser_name": parsed_statement.parser_name,
+                "transaction_count": len(parsed_statement.transactions),
+            },
+        )
+        output_func(
+            f"Parsing completato: {len(parsed_statement.transactions)} movimenti con parser {parsed_statement.parser_name}."
+        )
 
-    llm_batch = _categorize_with_retry(
-        rule_batch.unmatched,
-        category_catalog,
-        runtime,
-        categorize_func,
-        llm_attempts,
-    )
-    LOGGER.info("LLM categorization completed", extra={"classified_count": len(llm_batch.classified)})
+        rules = _load_rules(target, runtime, category_catalog, load_rules_func)
+        rule_batch = apply_rules_func(parsed_statement.transactions, rules)
+        LOGGER.info(
+            "Deterministic rules applied",
+            extra={
+                "matched_count": len(rule_batch.classified),
+                "unmatched_count": len(rule_batch.unmatched),
+            },
+        )
 
-    classified_transactions = _merge_classified_transactions(
-        parsed_statement.transactions,
-        rule_batch,
-        llm_batch,
-    )
+        llm_batch = _categorize_with_retry(
+            rule_batch.unmatched,
+            category_catalog,
+            runtime,
+            categorize_func,
+            llm_attempts,
+        )
+        LOGGER.info("LLM categorization completed", extra={"classified_count": len(llm_batch.classified)})
+
+        classified_transactions = _merge_classified_transactions(
+            parsed_statement.transactions,
+            rule_batch,
+            llm_batch,
+        )
+        rule_classified_count = len(rule_batch.classified)
+        llm_classified_count = len(llm_batch.classified)
+        initial_reviewed_count = 0
+        _save_checkpoint(
+            runtime,
+            file_path,
+            source_bank,
+            parsed_statement.parser_name,
+            rule_classified_count,
+            llm_classified_count,
+            classified_transactions,
+            initial_reviewed_count,
+        )
+
     review_result = review_func(
         classified_transactions,
         category_catalog,
+        initial_reviewed_count=initial_reviewed_count,
+        on_review_progress=lambda reviewed_so_far, reviewed_count: _save_checkpoint(
+            runtime,
+            file_path,
+            source_bank,
+            parsed_statement.parser_name,
+            rule_classified_count,
+            llm_classified_count,
+            tuple(reviewed_so_far) + classified_transactions[reviewed_count:],
+            reviewed_count,
+        ),
         input_func=input_func,
         output_func=output_func,
     )
     LOGGER.info("Review completed", extra={"confirmed": review_result.confirmed})
 
     if not review_result.confirmed:
-        output_func("Import annullato prima della scrittura.")
+        output_func("Import annullato prima della scrittura. Checkpoint mantenuto.")
         return ImportRunResult(
             parser_name=parsed_statement.parser_name,
             transaction_count=len(parsed_statement.transactions),
-            rule_classified_count=len(rule_batch.classified),
-            llm_classified_count=len(llm_batch.classified),
+            rule_classified_count=rule_classified_count,
+            llm_classified_count=llm_classified_count,
             confirmed=False,
             append_result=None,
         )
@@ -131,8 +175,8 @@ def run_import_pipeline(
         return ImportRunResult(
             parser_name=parsed_statement.parser_name,
             transaction_count=len(parsed_statement.transactions),
-            rule_classified_count=len(rule_batch.classified),
-            llm_classified_count=len(llm_batch.classified),
+            rule_classified_count=rule_classified_count,
+            llm_classified_count=llm_classified_count,
             confirmed=True,
             append_result=None,
         )
@@ -150,18 +194,33 @@ def run_import_pipeline(
             "start_row": append_result.start_row,
             "row_count": append_result.row_count,
             "updated_range": append_result.updated_range,
+            "skipped_existing_count": append_result.skipped_existing_count,
         },
     )
-    output_func(
-        "Append completato: "
-        f"{append_result.row_count} righe scritte su {append_result.worksheet_title} "
-        f"a partire da {append_result.updated_range}."
-    )
+    delete_import_checkpoint(runtime.checkpoint_dir, file_path, source_bank)
+    if append_result.skipped_existing_count:
+        output_func(
+            "Checkpoint rilevato: "
+            f"{append_result.skipped_existing_count} transazioni gia' presenti su "
+            f"{append_result.worksheet_title}."
+        )
+
+    if append_result.row_count == 0:
+        output_func(
+            "Ripresa completata: nessuna nuova riga da scrivere su "
+            f"{append_result.worksheet_title}."
+        )
+    else:
+        output_func(
+            "Append completato: "
+            f"{append_result.row_count} righe scritte su {append_result.worksheet_title} "
+            f"a partire da {append_result.updated_range}."
+        )
     return ImportRunResult(
         parser_name=parsed_statement.parser_name,
         transaction_count=len(parsed_statement.transactions),
-        rule_classified_count=len(rule_batch.classified),
-        llm_classified_count=len(llm_batch.classified),
+        rule_classified_count=rule_classified_count,
+        llm_classified_count=llm_classified_count,
         confirmed=True,
         append_result=append_result,
     )
@@ -220,6 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         CategoryError,
         FileNotFoundError,
         gspread.GSpreadException,
+        ImportCheckpointError,
         ImportCLIError,
         ParserError,
         RuntimeConfigError,
@@ -228,6 +288,12 @@ def main(argv: list[str] | None = None) -> int:
     ) as exc:
         print(f"Import fallito: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print(
+            "Import interrotto. Se presente, il checkpoint locale verra' riusato al prossimo avvio.",
+            file=sys.stderr,
+        )
+        return 130
 
     return 0
 
@@ -368,4 +434,39 @@ def _transaction_fingerprint(transaction: Transaction) -> tuple:
         transaction.currency,
         transaction.original_description,
         transaction.raw_row_id,
+    )
+
+
+def _build_checkpoint_parsed_statement(
+    checkpoint: ImportCheckpoint,
+    source_bank: str,
+) -> ParsedStatement:
+    return ParsedStatement(
+        source_bank=source_bank,
+        transactions=checkpoint.transactions,
+        parser_name=checkpoint.parser_name,
+    )
+
+
+def _save_checkpoint(
+    runtime_config: RuntimeConfig,
+    file_path: str | Path,
+    source_bank: str,
+    parser_name: str,
+    rule_classified_count: int,
+    llm_classified_count: int,
+    transactions: list[Transaction] | tuple[Transaction, ...],
+    reviewed_count: int,
+) -> None:
+    save_import_checkpoint(
+        runtime_config.checkpoint_dir,
+        ImportCheckpoint(
+            file_path=str(Path(file_path).resolve()),
+            source_bank=source_bank,
+            parser_name=parser_name,
+            rule_classified_count=rule_classified_count,
+            llm_classified_count=llm_classified_count,
+            reviewed_count=reviewed_count,
+            transactions=tuple(transactions),
+        ),
     )

@@ -9,6 +9,7 @@ from wheresmymoney.sheet_writer import (
     SheetWriterError,
     append_transactions_to_sheet,
     build_append_rows,
+    detect_checkpoint_resume_count,
     find_next_transaction_row,
 )
 from wheresmymoney.target_config import TargetSheetConfig
@@ -287,6 +288,127 @@ def test_append_transactions_to_sheet_copies_format_to_all_new_rows() -> None:
             ]
         }
     ]
+
+
+def test_detect_checkpoint_resume_count_matches_partial_tail() -> None:
+    transactions = [
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="01/02/2026",
+            value_date="01/02/2026",
+            amount="-10,00",
+            currency="EUR",
+            original_description="movimento 1",
+            assigned_category="Regali",
+        ),
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="02/02/2026",
+            value_date="02/02/2026",
+            amount="-20,00",
+            currency="EUR",
+            original_description="movimento 2",
+            assigned_category="Regali",
+        ),
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="03/02/2026",
+            value_date="03/02/2026",
+            amount="-30,00",
+            currency="EUR",
+            original_description="movimento 3",
+            assigned_category="Regali",
+        ),
+    ]
+    worksheet = FakeWorksheet(
+        title="Comune_bpm",
+        values=[
+            [], [], [], [], [], [], [], [], [], [], [], [],
+            ["12", "€ 0,00"],
+            [],
+            ["Mese", "Data Valuta", "Importo", "Divisa", "Cat", "Descrizione"],
+            ["1", "31/01/2026", "-5,00", "EUR", "Regali", "movimento precedente"],
+            ["2", "01/02/2026", "-10,00", "EUR", "Regali", "movimento 1"],
+            ["2", "02/02/2026", "-20,00", "EUR", "Regali", "movimento 2"],
+        ],
+    )
+
+    sheet_values = worksheet.get_all_values()
+    next_row = find_next_transaction_row(sheet_values, 16, "with_month_formula")
+
+    assert (
+        detect_checkpoint_resume_count(
+            sheet_values,
+            transactions,
+            _config(),
+            "with_month_formula",
+            next_row,
+        )
+        == 2
+    )
+
+
+def test_append_transactions_to_sheet_resumes_after_partial_append() -> None:
+    worksheet = FakeWorksheet(
+        title="Comune_bpm",
+        values=[
+            [], [], [], [], [], [], [], [], [], [], [], [],
+            ["12", "€ 0,00"],
+            [],
+            ["Mese", "Data Valuta", "Importo", "Divisa", "Cat", "Descrizione"],
+            ["1", "31/01/2026", "-5,00", "EUR", "Regali", "movimento precedente"],
+            ["2", "01/02/2026", "-10,00", "EUR", "Regali", "movimento 1"],
+            ["2", "02/02/2026", "-20,00", "EUR", "Regali", "movimento 2"],
+        ],
+    )
+    transactions = [
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="01/02/2026",
+            value_date="01/02/2026",
+            amount="-10,00",
+            currency="EUR",
+            original_description="movimento 1",
+            assigned_category="Regali",
+        ),
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="02/02/2026",
+            value_date="02/02/2026",
+            amount="-20,00",
+            currency="EUR",
+            original_description="movimento 2",
+            assigned_category="Regali",
+        ),
+        Transaction(
+            source_bank="Comune_bpm",
+            transaction_date="03/02/2026",
+            value_date="03/02/2026",
+            amount="-30,00",
+            currency="EUR",
+            original_description="movimento 3",
+            assigned_category="Regali",
+        ),
+    ]
+
+    result = append_transactions_to_sheet(
+        worksheet,
+        transactions,
+        _config(),
+    )
+
+    assert result.start_row == 19
+    assert result.row_count == 1
+    assert result.updated_range == "A19:F19"
+    assert result.skipped_existing_count == 2
+    assert worksheet.last_update_values == [[
+        "=MONTH(B19)",
+        "03/02/2026",
+        "-30,00",
+        "EUR",
+        "Regali",
+        "movimento 3",
+    ]]
 
 
 def test_append_transactions_to_sheet_rejects_protected_or_unknown_layout(

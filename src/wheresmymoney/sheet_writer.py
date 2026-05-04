@@ -20,6 +20,7 @@ class AppendResult:
     start_row: int
     row_count: int
     updated_range: str
+    skipped_existing_count: int = 0
 
 
 class WorksheetLike(Protocol):
@@ -59,8 +60,26 @@ def append_transactions_to_sheet(
         write_mode,
     )
     ordered_transactions = _sort_transactions_for_append(transactions)
-    payload = build_append_rows(
+    skipped_existing_count = detect_checkpoint_resume_count(
+        sheet_values,
         ordered_transactions,
+        target_config,
+        write_mode,
+        next_row,
+    )
+    pending_transactions = ordered_transactions[skipped_existing_count:]
+
+    if not pending_transactions:
+        return AppendResult(
+            worksheet_title=worksheet.title,
+            start_row=next_row,
+            row_count=0,
+            updated_range="",
+            skipped_existing_count=skipped_existing_count,
+        )
+
+    payload = build_append_rows(
+        pending_transactions,
         next_row,
         target_config,
         write_mode,
@@ -85,6 +104,7 @@ def append_transactions_to_sheet(
         start_row=next_row,
         row_count=len(payload),
         updated_range=updated_range,
+        skipped_existing_count=skipped_existing_count,
     )
 
 
@@ -159,6 +179,36 @@ def build_update_range(start_row: int, row_count: int, write_mode: str) -> str:
     return f"A{start_row}:E{end_row}"
 
 
+def detect_checkpoint_resume_count(
+    sheet_values: list[list[str]],
+    transactions: list[Transaction] | tuple[Transaction, ...],
+    target_config: TargetSheetConfig,
+    write_mode: str,
+    next_row: int,
+) -> int:
+    if not transactions:
+        return 0
+
+    existing_signatures = _existing_transaction_signatures(
+        sheet_values,
+        target_config.transaction_start_row,
+        next_row,
+        write_mode,
+        len(target_config.bank_tab_columns),
+    )
+    candidate_signatures = [
+        _transaction_signature(transaction, target_config)
+        for transaction in transactions
+    ]
+
+    max_overlap = min(len(existing_signatures), len(candidate_signatures))
+    for overlap in range(max_overlap, 0, -1):
+        if existing_signatures[-overlap:] == candidate_signatures[:overlap]:
+            return overlap
+
+    return 0
+
+
 def _copy_row_format_to_append_range(
     worksheet: WorksheetLike,
     *,
@@ -216,6 +266,22 @@ def _sort_transactions_for_append(
     )
 
 
+def _existing_transaction_signatures(
+    sheet_values: list[list[str]],
+    transaction_start_row: int,
+    next_row: int,
+    write_mode: str,
+    column_count: int,
+) -> list[tuple[str, ...]]:
+    signatures: list[tuple[str, ...]] = []
+    for row_index in range(transaction_start_row, next_row):
+        row = sheet_values[row_index - 1]
+        signature = _sheet_row_signature(row, write_mode, column_count)
+        if any(cell for cell in signature):
+            signatures.append(signature)
+    return signatures
+
+
 def _get_header_row(
     sheet_values: list[list[str]],
     header_row_index: int,
@@ -259,3 +325,27 @@ def _find_amount_column_index(configured_columns: tuple[str, ...]) -> int:
 
 def _format_amount_for_sheet(value: str) -> str:
     return value.replace(".", ",")
+
+
+def _transaction_signature(
+    transaction: Transaction,
+    target_config: TargetSheetConfig,
+) -> tuple[str, ...]:
+    transaction_cells = transaction.to_sheet_row(target_config.bank_tab_columns)
+    amount_index = _find_amount_column_index(target_config.bank_tab_columns)
+    transaction_cells[amount_index] = _format_amount_for_sheet(
+        transaction_cells[amount_index]
+    )
+    return tuple(transaction_cells)
+
+
+def _sheet_row_signature(
+    row: list[str],
+    write_mode: str,
+    column_count: int,
+) -> tuple[str, ...]:
+    start_index = 1 if write_mode == "with_month_formula" else 0
+    cells = list(row[start_index : start_index + column_count])
+    if len(cells) < column_count:
+        cells.extend([""] * (column_count - len(cells)))
+    return tuple(cell.strip() if isinstance(cell, str) else "" for cell in cells)

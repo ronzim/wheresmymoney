@@ -26,6 +26,7 @@ def test_from_env_prefers_dotenv_over_existing_shell_env(
                 f"TARGET_SHEET_CONFIG={target_config}",
                 "GEMINI_MODEL=gemini-2.5-flash",
                 "GEMINI_BATCH_SIZE=12",
+                "WHERESMYMONEY_CHECKPOINT_DIR=.custom-checkpoints",
             ]
         ),
         encoding="utf-8",
@@ -39,6 +40,7 @@ def test_from_env_prefers_dotenv_over_existing_shell_env(
     assert runtime_config.gemini_api_key == "dotenv-key"
     assert runtime_config.gemini_model == "gemini-2.5-flash"
     assert runtime_config.gemini_batch_size == 12
+    assert runtime_config.checkpoint_dir == Path(".custom-checkpoints")
 
 
 def test_from_env_rejects_non_positive_gemini_batch_size(

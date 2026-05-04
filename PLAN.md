@@ -213,6 +213,7 @@ Checklist operativa per implementare il MVP come pipeline CLI interattiva append
 13. Migliorie e ottimizzazioni post-MVP
 
 - [x] Chiamate LLM in batch per ridurre costi e latenza
+- [x] Sistema di checkpoint per riprendere il lavoro in corso
 - [ ] Inserire nel contesto dell'LLM un csv con i dati categorizzati dell'anno scorso per migliorare la precisione
 
 **Out of scope del MVP**

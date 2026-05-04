@@ -303,3 +303,35 @@ def test_review_cli_treats_autocomplete_cancel_as_clean_abort() -> None:
 
     assert result.confirmed is False
     assert any("Operazione annullata" in line for line in outputs)
+
+
+def test_review_cli_resumes_from_saved_progress_and_persists_updates() -> None:
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa", "Mutuo", "Viaggi"],
+        header_name="Categorie",
+    )
+    outputs: list[str] = []
+    saved_progress: list[tuple[tuple[Transaction, ...], int]] = []
+    answers = iter(["3", "y"])
+    transactions = (
+        _transaction(original_description="gia rivista", assigned_category="Mutuo"),
+        _transaction(original_description="da rivedere", assigned_category="Spesa"),
+    )
+
+    result = review_transactions_interactively(
+        transactions,
+        catalog,
+        initial_reviewed_count=1,
+        on_review_progress=lambda reviewed, count: saved_progress.append((reviewed, count)),
+        input_func=lambda _prompt: next(answers),
+        output_func=outputs.append,
+    )
+
+    assert result.confirmed is True
+    assert result.reviewed_transactions[0].assigned_category == "Mutuo"
+    assert result.reviewed_transactions[1].assigned_category == "Viaggi"
+    assert saved_progress[-1][1] == 2
+    assert [item.original_description for item in saved_progress[-1][0]] == [
+        "gia rivista",
+        "da rivedere",
+    ]
