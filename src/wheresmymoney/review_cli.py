@@ -89,28 +89,36 @@ def review_transactions_interactively(
     )
     reviewed_transactions: list[Transaction] = []
 
-    for index, transaction in enumerate(transactions, start=1):
-        reviewed_transactions.append(
-            _review_single_transaction(
-                index,
-                len(transactions),
-                transaction,
-                category_catalog,
-                input_func=input_func,
-                output_func=output_func,
-                prompt_ui=effective_prompt_ui,
-                styler=styler,
+    try:
+        for index, transaction in enumerate(transactions, start=1):
+            reviewed_transactions.append(
+                _review_single_transaction(
+                    index,
+                    len(transactions),
+                    transaction,
+                    category_catalog,
+                    input_func=input_func,
+                    output_func=output_func,
+                    prompt_ui=effective_prompt_ui,
+                    styler=styler,
+                )
             )
+
+        finalized_transactions, confirmed = _finalize_review(
+            reviewed_transactions,
+            category_catalog,
+            input_func=input_func,
+            output_func=output_func,
+            prompt_ui=effective_prompt_ui,
+            styler=styler,
+        )
+    except ReviewCLIError:
+        output_func("Operazione annullata. Nessuna scrittura verra' eseguita.")
+        return ReviewSessionResult(
+            reviewed_transactions=tuple(reviewed_transactions),
+            confirmed=False,
         )
 
-    finalized_transactions, confirmed = _finalize_review(
-        reviewed_transactions,
-        category_catalog,
-        input_func=input_func,
-        output_func=output_func,
-        prompt_ui=effective_prompt_ui,
-        styler=styler,
-    )
     return ReviewSessionResult(
         reviewed_transactions=tuple(finalized_transactions),
         confirmed=confirmed,

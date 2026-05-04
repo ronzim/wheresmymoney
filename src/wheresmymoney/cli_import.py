@@ -204,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         level=getattr(logging, args.log_level),
         format="%(levelname)s %(message)s",
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     try:
         run_import_pipeline(
@@ -288,47 +289,46 @@ def _categorize_with_retry(
         return LLMCategorizationBatch(classified=())
 
     attempts = max(1, llm_attempts)
-    classified = []
-    for transaction in transactions:
-        last_error: Exception | None = None
-        for attempt in range(1, attempts + 1):
-            try:
-                batch = categorize_func([transaction], category_catalog, runtime_config)
-                classified.extend(batch.classified)
-                break
-            except Exception as exc:  # retry is only for external LLM call failures
-                last_error = exc
-                LOGGER.warning(
-                    "LLM categorization attempt failed",
-                    extra={
-                        "attempt": attempt,
-                        "attempts": attempts,
-                        "error": str(exc),
-                        "original_description": transaction.original_description,
-                    },
-                )
-                if attempt == attempts:
-                    LOGGER.error(
-                        "LLM categorization degraded to fallback",
-                        extra={
-                            "attempts": attempts,
-                            "error": str(last_error),
-                            "original_description": transaction.original_description,
-                        },
-                    )
-                    classified.append(
-                        LLMCategorization(
-                            transaction=replace(
-                                transaction,
-                                assigned_category=FALLBACK_CATEGORY,
-                                cleaned_description=transaction.original_description.strip(),
-                            ),
-                            classification_source="llm_retry_fallback",
-                            raw_response=str(last_error),
-                        )
-                    )
+    last_error: Exception | None = None
 
-    return LLMCategorizationBatch(classified=tuple(classified))
+    for attempt in range(1, attempts + 1):
+        try:
+            return categorize_func(transactions, category_catalog, runtime_config)
+        except Exception as exc:  # retry is only for external LLM call failures
+            last_error = exc
+            LOGGER.warning(
+                "LLM categorization attempt failed",
+                extra={
+                    "attempt": attempt,
+                    "attempts": attempts,
+                    "error": str(exc),
+                    "transaction_count": len(transactions),
+                },
+            )
+
+    LOGGER.error(
+        "LLM categorization degraded to fallback",
+        extra={
+            "attempts": attempts,
+            "error": str(last_error),
+            "transaction_count": len(transactions),
+        },
+    )
+
+    return LLMCategorizationBatch(
+        classified=tuple(
+            LLMCategorization(
+                transaction=replace(
+                    transaction,
+                    assigned_category=FALLBACK_CATEGORY,
+                    cleaned_description=transaction.original_description.strip(),
+                ),
+                classification_source="llm_retry_fallback",
+                raw_response=str(last_error),
+            )
+            for transaction in transactions
+        )
+    )
 
 
 def _merge_classified_transactions(

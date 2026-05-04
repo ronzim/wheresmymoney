@@ -93,6 +93,7 @@ Se il terminale non supporta la UI interattiva oppure la libreria non e' disponi
 - la colonna `Mese` non viene presa dai dati sorgente
 - se il tab usa `Mese` come formula in colonna A, il writer scrive `=MONTH(Bn)` nelle nuove righe
 - i tab protetti come `Categorie` e `Andamento` non sono scrivibili
+- le transazioni non coperte da regole vengono inviate a Gemini in batch, per ridurre numero di chiamate, latenza e costo
 - in caso di errore LLM persistente, la transazione degrada in modo sicuro a `Da Verificare`
 
 ### Formati bancari attualmente coperti
@@ -128,6 +129,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON=/absolute/path/to/service-account.json
 GEMINI_API_KEY=your_gemini_api_key
 TARGET_SHEET_CONFIG=config/target_sheet.example.json
 GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BATCH_SIZE=20
 ```
 
 Significato:
@@ -143,6 +145,17 @@ Significato:
 
 4. `GEMINI_MODEL`
    Modello Gemini usato dalla pipeline. Quello verificato in questo progetto e' `gemini-2.5-flash`.
+
+5. `GEMINI_BATCH_SIZE`
+   Numero di transazioni inviate a Gemini per singola chiamata. Deve essere un intero positivo. Se non lo imposti, il default e' `20`.
+
+Per impostarla, aggiungi o modifica questa riga nel file `.env`:
+
+```dotenv
+GEMINI_BATCH_SIZE=20
+```
+
+Valori piu' alti riducono il numero di chiamate ma aumentano la dimensione del prompt. Valori piu' bassi riducono il payload per richiesta ma aumentano il numero di chiamate.
 
 ### Configurazione del foglio target
 
@@ -308,7 +321,7 @@ File principali:
 
 ### Punto 7
 
-Classificatore LLM con output JSON strutturato e fallback locale sicuro.
+Classificatore LLM con output JSON strutturato, batching delle richieste e fallback locale sicuro.
 
 File principali:
 

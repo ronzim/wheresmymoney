@@ -24,6 +24,8 @@ class AppendResult:
 
 class WorksheetLike(Protocol):
     title: str
+    id: int
+    spreadsheet: object
 
     def get_all_values(self) -> list[list[str]]:
         ...
@@ -56,8 +58,21 @@ def append_transactions_to_sheet(
         target_config.transaction_start_row,
         write_mode,
     )
-    payload = build_append_rows(transactions, next_row, target_config, write_mode)
+    ordered_transactions = _sort_transactions_for_append(transactions)
+    payload = build_append_rows(
+        ordered_transactions,
+        next_row,
+        target_config,
+        write_mode,
+    )
     updated_range = build_update_range(next_row, len(payload), write_mode)
+
+    _copy_row_format_to_append_range(
+        worksheet,
+        template_row=next_row - 1,
+        destination_start_row=next_row,
+        row_count=len(payload),
+    )
 
     worksheet.update(
         range_name=updated_range,
@@ -87,7 +102,9 @@ def append_transactions_via_gspread(
     client = gspread.service_account(
         filename=str(runtime_config.google_service_account_json)
     )
-    worksheet = client.open_by_key(target_config.spreadsheet_id).worksheet(worksheet_title)
+    worksheet = client.open_by_key(
+        target_config.spreadsheet_id
+    ).worksheet(worksheet_title)
     return append_transactions_to_sheet(worksheet, transactions, target_config)
 
 
@@ -102,7 +119,9 @@ def find_next_transaction_row(
     for row_index in range(transaction_start_row, len(sheet_values) + 1):
         row = sheet_values[row_index - 1]
         relevant_cells = row[first_data_column:]
-        if any(cell.strip() for cell in relevant_cells if isinstance(cell, str)):
+        if any(
+            cell.strip() for cell in relevant_cells if isinstance(cell, str)
+        ):
             last_non_empty_row = row_index
 
     return last_non_empty_row + 1
@@ -119,7 +138,9 @@ def build_append_rows(
 
     for offset, transaction in enumerate(transactions):
         row_number = start_row + offset
-        transaction_cells = transaction.to_sheet_row(target_config.bank_tab_columns)
+        transaction_cells = transaction.to_sheet_row(
+            target_config.bank_tab_columns
+        )
         transaction_cells[amount_index] = _format_amount_for_sheet(
             transaction_cells[amount_index]
         )
@@ -138,9 +159,71 @@ def build_update_range(start_row: int, row_count: int, write_mode: str) -> str:
     return f"A{start_row}:E{end_row}"
 
 
-def _get_header_row(sheet_values: list[list[str]], header_row_index: int) -> list[str]:
+def _copy_row_format_to_append_range(
+    worksheet: WorksheetLike,
+    *,
+    template_row: int,
+    destination_start_row: int,
+    row_count: int,
+) -> None:
+    if template_row < 1 or row_count < 1:
+        return
+
+    spreadsheet = getattr(worksheet, "spreadsheet", None)
+    sheet_id = getattr(worksheet, "id", None)
+    if spreadsheet is None or sheet_id is None:
+        return
+
+    batch_update = getattr(spreadsheet, "batch_update", None)
+    if not callable(batch_update):
+        return
+
+    batch_update(
+        {
+            "requests": [
+                {
+                    "copyPaste": {
+                        "source": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": template_row - 1,
+                            "endRowIndex": template_row,
+                        },
+                        "destination": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": destination_start_row - 1,
+                            "endRowIndex": (
+                                destination_start_row - 1 + row_count
+                            ),
+                        },
+                        "pasteType": "PASTE_FORMAT",
+                        "pasteOrientation": "NORMAL",
+                    }
+                }
+            ]
+        }
+    )
+
+
+def _sort_transactions_for_append(
+    transactions: list[Transaction] | tuple[Transaction, ...],
+) -> list[Transaction]:
+    return sorted(
+        transactions,
+        key=lambda transaction: (
+            transaction.value_date,
+            transaction.transaction_date,
+        ),
+    )
+
+
+def _get_header_row(
+    sheet_values: list[list[str]],
+    header_row_index: int,
+) -> list[str]:
     if header_row_index < 1 or header_row_index > len(sheet_values):
-        raise SheetWriterError("Header row is outside the current sheet bounds")
+        raise SheetWriterError(
+            "Header row is outside the current sheet bounds"
+        )
     return sheet_values[header_row_index - 1]
 
 
@@ -148,7 +231,9 @@ def _resolve_write_mode(
     header_row: list[str],
     configured_columns: tuple[str, ...],
 ) -> str:
-    normalized_header = [cell.strip() for cell in header_row if isinstance(cell, str)]
+    normalized_header = [
+        cell.strip() for cell in header_row if isinstance(cell, str)
+    ]
     configured = list(configured_columns)
 
     if normalized_header[: len(configured)] == configured:
@@ -167,7 +252,9 @@ def _find_amount_column_index(configured_columns: tuple[str, ...]) -> int:
     try:
         return list(configured_columns).index("Importo")
     except ValueError as exc:
-        raise SheetWriterError("The target sheet config must include the 'Importo' column") from exc
+        raise SheetWriterError(
+            "The target sheet config must include the 'Importo' column"
+        ) from exc
 
 
 def _format_amount_for_sheet(value: str) -> str:

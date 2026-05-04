@@ -210,6 +210,11 @@ Checklist operativa per implementare il MVP come pipeline CLI interattiva append
 - [x] Nessuna formula o dato esistente viene modificato
 - [x] I tab di analisi non vengono mai toccati
 
+13. Migliorie e ottimizzazioni post-MVP
+
+- [x] Chiamate LLM in batch per ridurre costi e latenza
+- [ ] Inserire nel contesto dell'LLM un csv con i dati categorizzati dell'anno scorso per migliorare la precisione
+
 **Out of scope del MVP**
 
 - [ ] Deduplica automatica dei movimenti

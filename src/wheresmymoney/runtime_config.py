@@ -11,6 +11,7 @@ class RuntimeConfigError(ValueError):
 
 DEFAULT_TARGET_CONFIG_PATH = "config/target_sheet.example.json"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_BATCH_SIZE = 20
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class RuntimeConfig:
     gemini_api_key: str | None
     target_sheet_config_path: Path
     gemini_model: str = DEFAULT_GEMINI_MODEL
+    gemini_batch_size: int = DEFAULT_GEMINI_BATCH_SIZE
 
     @classmethod
     def from_env(
@@ -45,12 +47,17 @@ class RuntimeConfig:
             "GEMINI_MODEL",
             default=DEFAULT_GEMINI_MODEL,
         )
+        gemini_batch_size = _load_positive_int_env(
+            "GEMINI_BATCH_SIZE",
+            default=DEFAULT_GEMINI_BATCH_SIZE,
+        )
 
         return cls(
             google_service_account_json=google_credentials,
             gemini_api_key=gemini_api_key,
             target_sheet_config_path=target_sheet_config_path,
             gemini_model=gemini_model,
+            gemini_batch_size=gemini_batch_size,
         )
 
 
@@ -106,3 +113,33 @@ def _load_path_env(
     if allow_missing and (value is None or not str(value).strip()):
         return None
     return _require_existing_path(value, env_name)
+
+
+def _load_positive_int_env(
+    env_name: str,
+    *,
+    default: int,
+) -> int:
+    value = os.getenv(env_name)
+    if value is None:
+        return default
+
+    normalized = value.strip()
+    if not normalized:
+        raise RuntimeConfigError(
+            f"Missing required environment variable: {env_name}"
+        )
+
+    try:
+        parsed = int(normalized)
+    except ValueError as exc:
+        raise RuntimeConfigError(
+            f"{env_name} must be a positive integer"
+        ) from exc
+
+    if parsed < 1:
+        raise RuntimeConfigError(
+            f"{env_name} must be a positive integer"
+        )
+
+    return parsed

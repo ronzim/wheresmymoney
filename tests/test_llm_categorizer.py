@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from pathlib import Path
 
@@ -195,3 +196,115 @@ def test_categorize_transactions_with_llm_passes_similar_examples_to_prompt() ->
     assert captured_prompts
     assert '"similar_examples": [' in captured_prompts[0]
     assert '"original_description": "spesa supermercato centro"' in captured_prompts[0]
+
+
+def test_categorize_transactions_with_llm_batches_multiple_transactions() -> None:
+    catalog = build_category_catalog(["Categorie", "Mutuo", "Spesa"], header_name="Categorie")
+    runtime = _runtime_config()
+    transactions = [
+        Transaction(
+            source_bank="Lisa",
+            transaction_date="01/01/2026",
+            value_date="01/01/2026",
+            amount="-100,00",
+            currency="EUR",
+            original_description="addebito mutuo gennaio",
+        ),
+        Transaction(
+            source_bank="Lisa",
+            transaction_date="02/01/2026",
+            value_date="02/01/2026",
+            amount="-45,20",
+            currency="EUR",
+            original_description="spesa supermercato",
+        ),
+    ]
+    captured_prompts: list[str] = []
+
+    def responder(prompt: str, _model: str) -> str:
+        captured_prompts.append(prompt)
+        return (
+            '{"classifications": ['
+            '{"transaction_index": 0, "assigned_category": "Mutuo", "cleaned_description": "Rata mutuo gennaio"}, '
+            '{"transaction_index": 1, "assigned_category": "Spesa", "cleaned_description": "Supermercato"}'
+            ']}'
+        )
+
+    result = categorize_transactions_with_llm(
+        transactions,
+        catalog,
+        runtime,
+        responder=responder,
+    )
+
+    assert len(captured_prompts) == 1
+    assert '"transaction_index": 0' in captured_prompts[0]
+    assert '"transaction_index": 1' in captured_prompts[0]
+    assert '"original_description": "addebito mutuo gennaio"' in captured_prompts[0]
+    assert '"original_description": "spesa supermercato"' in captured_prompts[0]
+    assert result.classified[0].classification_source == "llm"
+    assert result.classified[0].transaction.assigned_category == "Mutuo"
+    assert result.classified[1].classification_source == "llm"
+    assert result.classified[1].transaction.assigned_category == "Spesa"
+
+
+def test_categorize_transactions_with_llm_logs_batch_progress(caplog) -> None:
+    catalog = build_category_catalog(["Categorie", "Mutuo", "Spesa"], header_name="Categorie")
+    runtime = RuntimeConfig(
+        google_service_account_json=None,
+        gemini_api_key="test-key",
+        target_sheet_config_path=Path("config/target_sheet.example.json"),
+        gemini_model="gemini-2.5-flash",
+        gemini_batch_size=1,
+    )
+    transactions = [
+        Transaction(
+            source_bank="Lisa",
+            transaction_date="01/01/2026",
+            value_date="01/01/2026",
+            amount="-100,00",
+            currency="EUR",
+            original_description="addebito mutuo gennaio",
+        ),
+        Transaction(
+            source_bank="Lisa",
+            transaction_date="02/01/2026",
+            value_date="02/01/2026",
+            amount="-45,20",
+            currency="EUR",
+            original_description="spesa supermercato",
+        ),
+    ]
+
+    def responder(prompt: str, _model: str) -> str:
+        if '"transaction_index": 0' in prompt:
+            return '{"classifications": [{"transaction_index": 0, "assigned_category": "Mutuo", "cleaned_description": "Rata mutuo gennaio"}]}'
+        return '{"classifications": [{"transaction_index": 0, "assigned_category": "Spesa", "cleaned_description": "Supermercato"}]}'
+
+    with caplog.at_level(logging.INFO, logger="wheresmymoney.llm_categorizer"):
+        categorize_transactions_with_llm(
+            transactions,
+            catalog,
+            runtime,
+            responder=responder,
+        )
+
+    send_records = [
+        record for record in caplog.records if record.msg == "Invio batch LLM %s/%s (%s)"
+    ]
+    completed_records = [
+        record
+        for record in caplog.records
+        if record.msg == "Batch LLM %s/%s completato (%s), fallback=%s"
+    ]
+
+    assert len(send_records) == 2
+    assert len(completed_records) == 2
+    assert "Invio batch LLM 1/2 (1-1/2)" in caplog.text
+    assert "Invio batch LLM 2/2 (2-2/2)" in caplog.text
+    assert "Batch LLM 1/2 completato (1-1/2), fallback=0" in caplog.text
+    assert "Batch LLM 2/2 completato (2-2/2), fallback=0" in caplog.text
+    assert send_records[0].transaction_range == "1-1/2"
+    assert send_records[1].transaction_range == "2-2/2"
+    assert completed_records[0].request_succeeded is True
+    assert completed_records[1].request_succeeded is True

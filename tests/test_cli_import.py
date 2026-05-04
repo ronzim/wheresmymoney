@@ -260,6 +260,95 @@ def test_run_import_pipeline_appends_after_confirmation() -> None:
     assert append_calls[0][3][0].assigned_category == "Salute"
 
 
+def test_run_import_pipeline_passes_all_unmatched_transactions_to_llm_once() -> None:
+    original_transactions = (
+        _transaction("spesa supermercato", "-34,50"),
+        _transaction("benzina", "-60,00"),
+        _transaction("ristorante", "-25,00"),
+    )
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa", "Auto", "Svago"],
+        header_name="Categorie",
+    )
+    categorize_calls: list[tuple[Transaction, ...]] = []
+
+    def parse_statement_func(_file_path: str | Path, _source_bank: str) -> DummyParsedStatement:
+        return DummyParsedStatement(
+            source_bank="Comune_bpm",
+            transactions=original_transactions,
+            parser_name="fake_parser",
+        )
+
+    def load_categories_func(_runtime: RuntimeConfig, _target: TargetSheetConfig):
+        return catalog
+
+    def load_rules_func(_file_path: str | Path, _catalog):
+        return ()
+
+    def apply_rules_func(transactions, _rules):
+        return RuleApplicationBatch(classified=(), unmatched=tuple(transactions))
+
+    def categorize_func(transactions, _catalog, _runtime):
+        categorize_calls.append(tuple(transactions))
+        categories = ("Spesa", "Auto", "Svago")
+        cleaned = ("Supermercato", "Carburante", "Ristorante")
+        classified = []
+        for transaction, category, cleaned_description in zip(
+            transactions,
+            categories,
+            cleaned,
+        ):
+            classified.append(
+                LLMCategorization(
+                    transaction=Transaction(
+                        source_bank="Comune_bpm",
+                        transaction_date=date(2026, 4, 21),
+                        value_date=date(2026, 4, 21),
+                        amount=transaction.amount,
+                        currency="EUR",
+                        original_description=transaction.original_description,
+                        cleaned_description=cleaned_description,
+                        assigned_category=category,
+                    ),
+                    classification_source="llm",
+                    raw_response="{}",
+                )
+            )
+        return LLMCategorizationBatch(classified=tuple(classified))
+
+    def review_func(transactions, _catalog, **_kwargs):
+
+        class Result:
+            reviewed_transactions = tuple(transactions)
+            confirmed = True
+
+        return Result()
+
+    result = run_import_pipeline(
+        "dummy.xlsx",
+        "Comune_bpm",
+        dry_run=True,
+        runtime_config=_runtime(),
+        target_config=_target(),
+        parse_statement_func=parse_statement_func,
+        load_categories_func=load_categories_func,
+        load_rules_func=load_rules_func,
+        apply_rules_func=apply_rules_func,
+        categorize_func=categorize_func,
+        review_func=review_func,
+        append_func=lambda *_args, **_kwargs: None,
+        output_func=lambda _message: None,
+    )
+
+    assert result.llm_classified_count == 3
+    assert len(categorize_calls) == 1
+    assert [item.original_description for item in categorize_calls[0]] == [
+        "spesa supermercato",
+        "benzina",
+        "ristorante",
+    ]
+
+
 def test_run_import_pipeline_falls_back_when_llm_is_still_unavailable() -> None:
     original_transactions = (_transaction("fornitore sconosciuto", "-12,00"),)
     catalog = build_category_catalog(["Categorie", "Spesa"], header_name="Categorie")

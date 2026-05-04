@@ -7,6 +7,7 @@ import click
 from wheresmymoney.categories import build_category_catalog
 from wheresmymoney.models import Transaction
 from wheresmymoney.review_cli import (
+    ReviewCLIError,
     ReviewStyler,
     _format_category_choice_grid,
     review_transactions_interactively,
@@ -269,3 +270,36 @@ def test_review_cli_supports_many_categories_with_numeric_grid() -> None:
     assert result.confirmed is True
     assert result.reviewed_transactions[0].assigned_category == "Categoria 39"
     assert observed_choice_lengths == [3]
+
+
+def test_review_cli_treats_autocomplete_cancel_as_clean_abort() -> None:
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa", "Mutuo"],
+        header_name="Categorie",
+    )
+    outputs: list[str] = []
+
+    class PromptUIDouble:
+        def autocomplete(
+            self,
+            _message: str,
+            _choices: list[str],
+            default: str = "",
+        ) -> str:
+            raise ReviewCLIError("Interactive autocomplete cancelled")
+
+        def select(self, _message: str, choices: list[tuple[str, str]]) -> str:
+            return "__confirm__"
+
+        def confirm(self, _message: str, default: bool = False) -> bool:
+            return default
+
+    result = review_transactions_interactively(
+        [_transaction()],
+        catalog,
+        output_func=outputs.append,
+        prompt_ui=PromptUIDouble(),
+    )
+
+    assert result.confirmed is False
+    assert any("Operazione annullata" in line for line in outputs)

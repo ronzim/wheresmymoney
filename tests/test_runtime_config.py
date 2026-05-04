@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wheresmymoney.runtime_config import RuntimeConfig
+import pytest
+
+from wheresmymoney.runtime_config import RuntimeConfig, RuntimeConfigError
 
 
 def test_from_env_prefers_dotenv_over_existing_shell_env(
@@ -23,6 +25,7 @@ def test_from_env_prefers_dotenv_over_existing_shell_env(
                 "GEMINI_API_KEY=dotenv-key",
                 f"TARGET_SHEET_CONFIG={target_config}",
                 "GEMINI_MODEL=gemini-2.5-flash",
+                "GEMINI_BATCH_SIZE=12",
             ]
         ),
         encoding="utf-8",
@@ -35,3 +38,33 @@ def test_from_env_prefers_dotenv_over_existing_shell_env(
 
     assert runtime_config.gemini_api_key == "dotenv-key"
     assert runtime_config.gemini_model == "gemini-2.5-flash"
+    assert runtime_config.gemini_batch_size == 12
+
+
+def test_from_env_rejects_non_positive_gemini_batch_size(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_config = tmp_path / "target.json"
+    target_config.write_text("{}", encoding="utf-8")
+
+    service_account = tmp_path / "service-account.json"
+    service_account.write_text("{}", encoding="utf-8")
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                f"GOOGLE_SERVICE_ACCOUNT_JSON={service_account}",
+                "GEMINI_API_KEY=dotenv-key",
+                f"TARGET_SHEET_CONFIG={target_config}",
+                "GEMINI_BATCH_SIZE=0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("GEMINI_BATCH_SIZE", raising=False)
+
+    with pytest.raises(RuntimeConfigError, match="GEMINI_BATCH_SIZE"):
+        RuntimeConfig.from_env(env_file)

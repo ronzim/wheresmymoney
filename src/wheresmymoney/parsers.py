@@ -39,6 +39,8 @@ HTML_XLS_HEADERS = (
     "Canale",
 )
 
+SIGNED_AMOUNT_XLSX_HEADER_PREFIX = HTML_XLS_HEADERS[:5]
+
 
 @dataclass(frozen=True)
 class ParsedStatement:
@@ -47,7 +49,10 @@ class ParsedStatement:
     parser_name: str
 
 
-def parse_statement(file_path: str | Path, source_bank: str) -> ParsedStatement:
+def parse_statement(
+    file_path: str | Path,
+    source_bank: str,
+) -> ParsedStatement:
     path = Path(file_path)
     parser_name = detect_parser(path)
 
@@ -55,6 +60,8 @@ def parse_statement(file_path: str | Path, source_bank: str) -> ParsedStatement:
         transactions = tuple(parse_structured_xlsx(path, source_bank))
     elif parser_name == "split_amount_xlsx":
         transactions = tuple(parse_split_amount_xlsx(path, source_bank))
+    elif parser_name == "signed_amount_xlsx":
+        transactions = tuple(parse_signed_amount_xlsx(path, source_bank))
     elif parser_name == "html_xls":
         transactions = tuple(parse_html_xls(path, source_bank))
     else:  # pragma: no cover - guarded by detect_parser
@@ -79,6 +86,8 @@ def detect_parser(file_path: str | Path) -> str:
             return "structured_xlsx"
         if _has_split_amount_xlsx_header(path):
             return "split_amount_xlsx"
+        if _has_signed_amount_xlsx_header(path):
+            return "signed_amount_xlsx"
         raise ParserError(f"Unsupported XLSX layout: {path.name}")
 
     if suffix == ".xls":
@@ -89,7 +98,10 @@ def detect_parser(file_path: str | Path) -> str:
     raise ParserError(f"Unsupported file extension: {path.suffix}")
 
 
-def parse_structured_xlsx(file_path: str | Path, source_bank: str) -> list[Transaction]:
+def parse_structured_xlsx(
+    file_path: str | Path,
+    source_bank: str,
+) -> list[Transaction]:
     path = Path(file_path)
     workbook = load_workbook(path, read_only=True, data_only=True)
     worksheet = workbook[workbook.sheetnames[0]]
@@ -108,7 +120,10 @@ def parse_structured_xlsx(file_path: str | Path, source_bank: str) -> list[Trans
     transactions: list[Transaction] = []
     for row in rows:
         data_op, data_val, _causale, descrizione, importo, divisa = row[:6]
-        if all(value in (None, "") for value in (data_op, data_val, descrizione, importo, divisa)):
+        if all(
+            value in (None, "")
+            for value in (data_op, data_val, descrizione, importo, divisa)
+        ):
             continue
         transactions.append(
             Transaction(
@@ -124,7 +139,10 @@ def parse_structured_xlsx(file_path: str | Path, source_bank: str) -> list[Trans
     return transactions
 
 
-def parse_split_amount_xlsx(file_path: str | Path, source_bank: str) -> list[Transaction]:
+def parse_split_amount_xlsx(
+    file_path: str | Path,
+    source_bank: str,
+) -> list[Transaction]:
     path = Path(file_path)
     workbook = load_workbook(path, read_only=False, data_only=True)
     worksheet = workbook[workbook.sheetnames[0]]
@@ -150,11 +168,21 @@ def parse_split_amount_xlsx(file_path: str | Path, source_bank: str) -> list[Tra
         )
         if all(
             value in (None, "")
-            for value in (data_contabile, data_valuta, addebiti, accrediti, descrizione)
+            for value in (
+                data_contabile,
+                data_valuta,
+                addebiti,
+                accrediti,
+                descrizione,
+            )
         ):
             continue
 
-        amount = _signed_amount_from_split_columns(addebiti, accrediti, path.name)
+        amount = _signed_amount_from_split_columns(
+            addebiti,
+            accrediti,
+            path.name,
+        )
         transactions.append(
             Transaction(
                 source_bank=source_bank,
@@ -169,7 +197,59 @@ def parse_split_amount_xlsx(file_path: str | Path, source_bank: str) -> list[Tra
     return transactions
 
 
-def parse_html_xls(file_path: str | Path, source_bank: str) -> list[Transaction]:
+def parse_signed_amount_xlsx(
+    file_path: str | Path,
+    source_bank: str,
+) -> list[Transaction]:
+    path = Path(file_path)
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    worksheet = workbook[workbook.sheetnames[0]]
+    rows = worksheet.iter_rows(values_only=True)
+
+    header_row_index = None
+    for row_index, row in enumerate(rows, start=1):
+        if _row_matches_signed_amount_xlsx_header(row):
+            header_row_index = row_index
+            break
+
+    if header_row_index is None:
+        raise ParserError(
+            f"Signed-amount XLSX header not found in {path.name}"
+        )
+
+    transactions: list[Transaction] = []
+    for row in rows:
+        data_contabile, data_valuta, importo, divisa, descrizione = row[:5]
+        if all(
+            value in (None, "")
+            for value in (
+                data_contabile,
+                data_valuta,
+                importo,
+                divisa,
+                descrizione,
+            )
+        ):
+            continue
+
+        transactions.append(
+            Transaction(
+                source_bank=source_bank,
+                transaction_date=data_contabile,
+                value_date=data_valuta,
+                amount=importo,
+                currency=str(divisa),
+                original_description=str(descrizione),
+            )
+        )
+
+    return transactions
+
+
+def parse_html_xls(
+    file_path: str | Path,
+    source_bank: str,
+) -> list[Transaction]:
     path = Path(file_path)
     parser = _StatementTableParser()
     parser.feed(path.read_text(encoding="utf-8", errors="ignore"))
@@ -180,7 +260,9 @@ def parse_html_xls(file_path: str | Path, source_bank: str) -> list[Transaction]
 
     header = tuple(rows[0])
     if header != HTML_XLS_HEADERS:
-        raise ParserError(f"Unexpected HTML XLS header in {path.name}: {header}")
+        raise ParserError(
+            f"Unexpected HTML XLS header in {path.name}: {header}"
+        )
 
     transactions: list[Transaction] = []
     for row in rows[1:]:
@@ -216,8 +298,20 @@ def _has_split_amount_xlsx_header(path: Path) -> bool:
     workbook = load_workbook(path, read_only=False, data_only=True)
     worksheet = workbook[workbook.sheetnames[0]]
     for row_index in range(1, worksheet.max_row + 1):
-        row = tuple(worksheet.cell(row_index, column_index).value for column_index in range(1, 6))
+        row = tuple(
+            worksheet.cell(row_index, column_index).value
+            for column_index in range(1, 6)
+        )
         if row == SPLIT_AMOUNT_XLSX_HEADERS:
+            return True
+    return False
+
+
+def _has_signed_amount_xlsx_header(path: Path) -> bool:
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    worksheet = workbook[workbook.sheetnames[0]]
+    for row in worksheet.iter_rows(values_only=True):
+        if _row_matches_signed_amount_xlsx_header(row):
             return True
     return False
 
@@ -229,6 +323,14 @@ def _looks_like_html_statement(path: Path) -> bool:
         and "causale / descrizione" in content
         and 'table id="ccmo"' in content
     )
+
+
+def _row_matches_signed_amount_xlsx_header(
+    row: tuple[object, ...] | list[object] | None,
+) -> bool:
+    if row is None:
+        return False
+    return tuple(row[:5]) == SIGNED_AMOUNT_XLSX_HEADER_PREFIX
 
 
 def _signed_amount_from_split_columns(
@@ -262,7 +364,11 @@ class _StatementTableParser(HTMLParser):
         self._in_relevant_table = False
         self._table_depth = 0
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
         attrs_dict = dict(attrs)
         if tag == "table" and attrs_dict.get("id") == "CCMO":
             self._in_relevant_table = True
@@ -283,7 +389,11 @@ class _StatementTableParser(HTMLParser):
         if not self._in_relevant_table:
             return
 
-        if tag in {"td", "th"} and self._current_cell is not None and self._current_row is not None:
+        if (
+            tag in {"td", "th"}
+            and self._current_cell is not None
+            and self._current_row is not None
+        ):
             value = "".join(self._current_cell)
             value = value.replace("\xa0", " ")
             self._current_row.append(value)

@@ -15,16 +15,40 @@ from wheresmymoney.target_config import TargetSheetConfig
 
 
 @dataclass
+class FakeSpreadsheet:
+    batch_update_requests: list[dict] | None = None
+
+    def __post_init__(self) -> None:
+        if self.batch_update_requests is None:
+            self.batch_update_requests = []
+
+    def batch_update(self, body: dict) -> object:
+        self.batch_update_requests.append(body)
+        return {"replies": []}
+
+
+@dataclass
 class FakeWorksheet:
     title: str
     values: list[list[str]]
+    id: int = 123
+    spreadsheet: FakeSpreadsheet | None = None
     last_update_range: str | None = None
     last_update_values: list[list[str]] | None = None
+
+    def __post_init__(self) -> None:
+        if self.spreadsheet is None:
+            self.spreadsheet = FakeSpreadsheet()
 
     def get_all_values(self) -> list[list[str]]:
         return self.values
 
-    def update(self, range_name: str, values: list[list[str]], **kwargs: object) -> object:
+    def update(
+        self,
+        range_name: str,
+        values: list[list[str]],
+        **kwargs: object,
+    ) -> object:
         self.last_update_range = range_name
         self.last_update_values = values
         return {"updatedRange": range_name}
@@ -71,11 +95,19 @@ def test_find_next_transaction_row_uses_existing_data_block() -> None:
         ["2", "01/02/2026", "-3,57", "EUR", "Regali", "pagamento 2"],
     ]
 
-    assert find_next_transaction_row(sheet_values, 16, "with_month_formula") == 18
+    assert (
+        find_next_transaction_row(sheet_values, 16, "with_month_formula")
+        == 18
+    )
 
 
 def test_build_append_rows_includes_month_formula_when_needed() -> None:
-    rows = build_append_rows([_transaction()], 18, _config(), "with_month_formula")
+    rows = build_append_rows(
+        [_transaction()],
+        18,
+        _config(),
+        "with_month_formula",
+    )
 
     assert rows == [[
         "=MONTH(B18)",
@@ -99,7 +131,11 @@ def test_append_transactions_to_sheet_updates_expected_range() -> None:
         ],
     )
 
-    result = append_transactions_to_sheet(worksheet, [_transaction()], _config())
+    result = append_transactions_to_sheet(
+        worksheet,
+        [_transaction()],
+        _config(),
+    )
 
     assert result.start_row == 17
     assert result.updated_range == "A17:F17"
@@ -111,12 +147,156 @@ def test_append_transactions_to_sheet_updates_expected_range() -> None:
         "Regali",
         "pagamento con carta",
     ]]
+    assert worksheet.spreadsheet is not None
+    assert worksheet.spreadsheet.batch_update_requests == [
+        {
+            "requests": [
+                {
+                    "copyPaste": {
+                        "source": {
+                            "sheetId": 123,
+                            "startRowIndex": 15,
+                            "endRowIndex": 16,
+                        },
+                        "destination": {
+                            "sheetId": 123,
+                            "startRowIndex": 16,
+                            "endRowIndex": 17,
+                        },
+                        "pasteType": "PASTE_FORMAT",
+                        "pasteOrientation": "NORMAL",
+                    }
+                }
+            ]
+        }
+    ]
 
 
-def test_append_transactions_to_sheet_rejects_protected_or_unknown_layout() -> None:
+def test_append_transactions_to_sheet_orders_oldest_first() -> None:
     worksheet = FakeWorksheet(
         title="Comune_bpm",
-        values=[[], [], [], [], [], [], [], [], [], [], [], [], [], [], ["Header sbagliato"]],
+        values=[
+            [], [], [], [], [], [], [], [], [], [], [], [],
+            ["12", "€ 0,00"],
+            [],
+            ["Mese", "Data Valuta", "Importo", "Divisa", "Cat", "Descrizione"],
+        ],
+    )
+    newer_transaction = Transaction(
+        source_bank="Comune_bpm",
+        transaction_date="04/02/2026",
+        value_date="04/02/2026",
+        amount="-20,00",
+        currency="EUR",
+        original_description="movimento piu recente",
+        assigned_category="Regali",
+    )
+    older_transaction = Transaction(
+        source_bank="Comune_bpm",
+        transaction_date="01/02/2026",
+        value_date="01/02/2026",
+        amount="-10,00",
+        currency="EUR",
+        original_description="movimento piu vecchio",
+        assigned_category="Regali",
+    )
+
+    append_transactions_to_sheet(
+        worksheet,
+        [newer_transaction, older_transaction],
+        _config(),
+    )
+
+    assert worksheet.last_update_values == [
+        [
+            "=MONTH(B16)",
+            "01/02/2026",
+            "-10,00",
+            "EUR",
+            "Regali",
+            "movimento piu vecchio",
+        ],
+        [
+            "=MONTH(B17)",
+            "04/02/2026",
+            "-20,00",
+            "EUR",
+            "Regali",
+            "movimento piu recente",
+        ],
+    ]
+
+
+def test_append_transactions_to_sheet_copies_format_to_all_new_rows() -> None:
+    worksheet = FakeWorksheet(
+        title="Comune_bpm",
+        values=[
+            [], [], [], [], [], [], [], [], [], [], [], [],
+            ["12", "€ 0,00"],
+            [],
+            ["Mese", "Data Valuta", "Importo", "Divisa", "Cat", "Descrizione"],
+            ["2", "01/02/2026", "-16", "EUR", "Regali", "pagamento 1"],
+        ],
+    )
+
+    append_transactions_to_sheet(
+        worksheet,
+        [
+            Transaction(
+                source_bank="Comune_bpm",
+                transaction_date="02/02/2026",
+                value_date="02/02/2026",
+                amount="-10,00",
+                currency="EUR",
+                original_description="movimento 2",
+                assigned_category="Regali",
+            ),
+            Transaction(
+                source_bank="Comune_bpm",
+                transaction_date="03/02/2026",
+                value_date="03/02/2026",
+                amount="-20,00",
+                currency="EUR",
+                original_description="movimento 3",
+                assigned_category="Regali",
+            ),
+        ],
+        _config(),
+    )
+
+    assert worksheet.spreadsheet is not None
+    assert worksheet.spreadsheet.batch_update_requests == [
+        {
+            "requests": [
+                {
+                    "copyPaste": {
+                        "source": {
+                            "sheetId": 123,
+                            "startRowIndex": 15,
+                            "endRowIndex": 16,
+                        },
+                        "destination": {
+                            "sheetId": 123,
+                            "startRowIndex": 16,
+                            "endRowIndex": 18,
+                        },
+                        "pasteType": "PASTE_FORMAT",
+                        "pasteOrientation": "NORMAL",
+                    }
+                }
+            ]
+        }
+    ]
+
+
+def test_append_transactions_to_sheet_rejects_protected_or_unknown_layout(
+) -> None:
+    worksheet = FakeWorksheet(
+        title="Comune_bpm",
+        values=[
+            [], [], [], [], [], [], [], [], [], [], [], [], [], [],
+            ["Header sbagliato"],
+        ],
     )
 
     with pytest.raises(SheetWriterError):
