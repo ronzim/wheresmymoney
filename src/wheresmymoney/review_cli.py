@@ -201,6 +201,8 @@ def _review_single_transaction(
         )
         if selected_category is None:
             return transaction
+        if selected_category == CLEAR_CATEGORY_SELECTION:
+            return replace(transaction, assigned_category=None)
         return replace(transaction, assigned_category=selected_category)
 
     while True:
@@ -210,12 +212,14 @@ def _review_single_transaction(
         answer = input_func(
             styler.prompt(
                 "Invio = tieni la categoria proposta, "
-                "testo = cerca categoria, ? = elenco: "
+                "0 = nessuna categoria, testo = cerca categoria, ? = elenco: "
             )
         ).strip()
 
         if not answer:
             return transaction
+        if _is_clear_category_answer(answer):
+            return replace(transaction, assigned_category=None)
 
         if answer.casefold() in {"?", "list", "lista", "help"}:
             _print_available_categories(
@@ -248,8 +252,8 @@ def _select_category_with_autocomplete_ui(
     while True:
         selected_value = prompt_ui.autocomplete(
             (
-                "Categoria: digita per cercare, ? per elenco, "
-                "Invio per tenere la proposta"
+                "Categoria: digita per cercare, 0 per nessuna categoria, "
+                "? per elenco, Invio per tenere la proposta"
             ),
             sorted_categories,
             default="",
@@ -257,6 +261,8 @@ def _select_category_with_autocomplete_ui(
 
         if not selected_value:
             return None
+        if _is_clear_category_answer(selected_value):
+            return CLEAR_CATEGORY_SELECTION
 
         if selected_value.casefold() in {"?", "list", "lista", "help"}:
             _print_available_categories(
@@ -274,6 +280,10 @@ def _select_category_with_autocomplete_ui(
         )
         if selected_category is not None:
             return selected_category
+
+
+def _is_clear_category_answer(answer: str) -> bool:
+    return answer.strip().casefold() in CLEAR_CATEGORY_INPUTS
 
 
 def _format_detail_line(
@@ -655,3 +665,5 @@ def _build_default_prompt_ui(
 
 
 FALLBACK_REVIEW_CATEGORY = "Da Verificare"
+CLEAR_CATEGORY_INPUTS = frozenset({"0", "-", "none", "nessuna"})
+CLEAR_CATEGORY_SELECTION = "__clear_category__"

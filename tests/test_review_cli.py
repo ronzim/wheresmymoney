@@ -101,6 +101,24 @@ def test_review_cli_changes_category_by_unique_prefix() -> None:
     assert result.reviewed_transactions[0].assigned_category == "Mutuo"
 
 
+def test_review_cli_clears_category_with_zero_shortcut() -> None:
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa", "Mutuo", "Viaggi"],
+        header_name="Categorie",
+    )
+    answers = iter(["0", "y"])
+
+    result = review_transactions_interactively(
+        [_transaction(assigned_category="Spesa")],
+        catalog,
+        input_func=lambda _prompt: next(answers),
+        output_func=lambda _message: None,
+    )
+
+    assert result.confirmed is True
+    assert result.reviewed_transactions[0].assigned_category is None
+
+
 def test_review_cli_prints_full_cleaned_description_and_category_after_it() -> None:
     catalog = build_category_catalog(
         ["Categorie", "Spesa", "Mutuo"],
@@ -270,6 +288,38 @@ def test_review_cli_supports_many_categories_with_numeric_grid() -> None:
     assert result.confirmed is True
     assert result.reviewed_transactions[0].assigned_category == "Categoria 39"
     assert observed_choice_lengths == [3]
+
+
+def test_review_cli_autocomplete_supports_zero_shortcut_for_empty_category() -> None:
+    catalog = build_category_catalog(
+        ["Categorie", "Spesa", "Mutuo", "Viaggi"],
+        header_name="Categorie",
+    )
+
+    class PromptUIDouble:
+        def autocomplete(
+            self,
+            _message: str,
+            _choices: list[str],
+            default: str = "",
+        ) -> str:
+            return "0"
+
+        def select(self, _message: str, _choices: list[tuple[str, str]]) -> str:
+            return "__confirm__"
+
+        def confirm(self, _message: str, default: bool = False) -> bool:
+            return default
+
+    result = review_transactions_interactively(
+        [_transaction(assigned_category="Spesa")],
+        catalog,
+        output_func=lambda _message: None,
+        prompt_ui=PromptUIDouble(),
+    )
+
+    assert result.confirmed is True
+    assert result.reviewed_transactions[0].assigned_category is None
 
 
 def test_review_cli_treats_autocomplete_cancel_as_clean_abort() -> None:

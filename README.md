@@ -81,6 +81,7 @@ Durante la review il tool:
 - mostra ogni transazione con data, importo, descrizione originale, descrizione pulita e categoria proposta
 - usa una selezione interattiva nel terminale con frecce e invio quando l'ambiente e' TTY compatibile
 - permette di tenere la categoria corrente o sostituirla scegliendola da una lista navigabile
+- permette di azzerare la categoria manualmente con il tasto `0` (nessuna categoria)
 - mostra un riepilogo finale completo prima della conferma
 - permette di riaprire una transazione dal riepilogo finale scegliendola da un menu finale
 - permette di confermare o annullare l'append finale
