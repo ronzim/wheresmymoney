@@ -105,6 +105,7 @@ def parse_structured_xlsx(
     path = Path(file_path)
     workbook = load_workbook(path, read_only=True, data_only=True)
     worksheet = workbook[workbook.sheetnames[0]]
+    worksheet.reset_dimensions()
     rows = worksheet.iter_rows(values_only=True)
 
     header_row_index = None
@@ -118,13 +119,31 @@ def parse_structured_xlsx(
         raise ParserError(f"Structured XLSX header not found in {path.name}")
 
     transactions: list[Transaction] = []
-    for row in rows:
-        data_op, data_val, _causale, descrizione, importo, divisa = row[:6]
+    for row_index, row in enumerate(rows, start=(header_row_index or 0) + 1):
+        data_op, data_val, _causale, descrizione, importo, divisa = _row_prefix(
+            row,
+            width=6,
+        )
         if all(
             value in (None, "")
             for value in (data_op, data_val, descrizione, importo, divisa)
         ):
             continue
+
+        if data_op in (None, "") and data_val in (None, ""):
+            continue
+
+        if importo in (None, "") or divisa in (None, ""):
+            raise ParserError(
+                f"Structured XLSX row {row_index} in {path.name} is missing amount or currency"
+            )
+
+        description = descrizione if descrizione not in (None, "") else _causale
+        if description in (None, ""):
+            raise ParserError(
+                f"Structured XLSX row {row_index} in {path.name} is missing description"
+            )
+
         transactions.append(
             Transaction(
                 source_bank=source_bank,
@@ -132,7 +151,7 @@ def parse_structured_xlsx(
                 value_date=str(data_val),
                 amount=str(importo),
                 currency=str(divisa),
-                original_description=str(descrizione),
+                original_description=str(description),
             )
         )
 
@@ -288,6 +307,7 @@ def parse_html_xls(
 def _has_structured_xlsx_header(path: Path) -> bool:
     workbook = load_workbook(path, read_only=True, data_only=True)
     worksheet = workbook[workbook.sheetnames[0]]
+    worksheet.reset_dimensions()
     for row in worksheet.iter_rows(values_only=True):
         if tuple(row[:6]) == STRUCTURED_XLSX_HEADERS:
             return True
@@ -331,6 +351,17 @@ def _row_matches_signed_amount_xlsx_header(
     if row is None:
         return False
     return tuple(row[:5]) == SIGNED_AMOUNT_XLSX_HEADER_PREFIX
+
+
+def _row_prefix(
+    row: tuple[object, ...] | list[object],
+    *,
+    width: int,
+) -> tuple[object, ...]:
+    prefix = tuple(row[:width])
+    if len(prefix) < width:
+        return prefix + (None,) * (width - len(prefix))
+    return prefix
 
 
 def _signed_amount_from_split_columns(

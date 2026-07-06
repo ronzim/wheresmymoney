@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 from pathlib import Path
+from xml.etree import ElementTree as ET
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook
 
@@ -102,6 +104,23 @@ def test_parse_signed_amount_xlsx_statement(tmp_path: Path) -> None:
     assert parsed.transactions[1].amount == Decimal("3689.00")
 
 
+def test_parse_structured_xlsx_with_truncated_dimension_ref(tmp_path: Path) -> None:
+    workbook_path = _build_structured_xlsx_with_truncated_dimension(tmp_path)
+
+    parsed = parse_statement(
+        workbook_path,
+        source_bank="Comune_ca",
+    )
+
+    assert parsed.parser_name == "structured_xlsx"
+    assert len(parsed.transactions) == 10
+    assert parsed.transactions[-1].original_description == "Movimento 10"
+    assert all(
+        not transaction.original_description.startswith("Totale")
+        for transaction in parsed.transactions
+    )
+
+
 def _build_signed_amount_xlsx(tmp_path: Path) -> Path:
     workbook = Workbook()
     worksheet = workbook.active
@@ -146,3 +165,62 @@ def _build_signed_amount_xlsx(tmp_path: Path) -> Path:
     workbook_path = tmp_path / "movimentiContoMattia.xlsx"
     workbook.save(workbook_path)
     return workbook_path
+
+
+def _build_structured_xlsx_with_truncated_dimension(tmp_path: Path) -> Path:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Lista Movimenti"
+    worksheet.append(list(STRUCTURED_HEADER))
+    for index in range(1, 11):
+        worksheet.append(
+            [
+                f"{index:02d}/06/2026",
+                f"{index:02d}/06/2026",
+                "CAUSALE",
+                f"Movimento {index}",
+                str(index),
+                "EUR",
+            ]
+        )
+    worksheet.append([None, None, None, "Totale Entrate €", 55, None])
+    worksheet.append([None, None, None, "Totale Uscite €", 55, None])
+
+    workbook_path = tmp_path / "structured_truncated_dimension.xlsx"
+    workbook.save(workbook_path)
+    _rewrite_sheet_dimension_ref(workbook_path, "A1:F6")
+    return workbook_path
+
+
+def _rewrite_sheet_dimension_ref(workbook_path: Path, ref: str) -> None:
+    entries: dict[str, bytes] = {}
+    with ZipFile(workbook_path, "r") as archive:
+        for member in archive.infolist():
+            entries[member.filename] = archive.read(member.filename)
+
+    sheet_xml_path = "xl/worksheets/sheet1.xml"
+    root = ET.fromstring(entries[sheet_xml_path])
+    namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    dimension = root.find("main:dimension", namespace)
+    if dimension is None:
+        raise AssertionError("Worksheet dimension tag is missing")
+    dimension.set("ref", ref)
+    entries[sheet_xml_path] = ET.tostring(
+        root,
+        encoding="utf-8",
+        xml_declaration=True,
+    )
+
+    with ZipFile(workbook_path, "w", compression=ZIP_DEFLATED) as archive:
+        for member_name, payload in entries.items():
+            archive.writestr(member_name, payload)
+
+
+STRUCTURED_HEADER = (
+    "Data Op.",
+    "Data Val.",
+    "Causale",
+    "Descrizione",
+    "Importo",
+    "Div.",
+)
