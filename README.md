@@ -117,7 +117,8 @@ Se il terminale non supporta la UI interattiva oppure la libreria non e' disponi
 
 ```bash
 uv venv
-source .venv/bin/activate
+source .venv/bin/activate # (linux)
+.venv\Scripts\activate # (windows)
 uv sync
 cp .env.example .env
 ```
