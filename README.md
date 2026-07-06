@@ -94,6 +94,7 @@ Se il terminale non supporta la UI interattiva oppure la libreria non e' disponi
 - se il tab usa `Mese` come formula in colonna A, il writer scrive `=MONTH(Bn)` nelle nuove righe
 - i tab protetti come `Categorie` e `Andamento` non sono scrivibili
 - le transazioni non coperte da regole vengono inviate a Gemini in batch, per ridurre numero di chiamate, latenza e costo
+- il prompt LLM include anche un contesto stabile sulle abitudini familiari (lavoro, pranzi ricorrenti, supermercati abituali, cane Linus) per migliorare la classificazione delle spese ricorrenti
 - in caso di errore LLM persistente, la transazione degrada in modo sicuro a `Da Verificare`
 - dopo la classificazione automatica e dopo ogni transazione revisionata, il tool salva un checkpoint locale per poter riprendere la review senza rifare parse, regole e chiamate LLM
 - il checkpoint locale viene eliminato solo dopo un append riuscito su Google Sheets

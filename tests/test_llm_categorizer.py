@@ -73,6 +73,8 @@ def test_build_categorization_prompt_includes_structured_context_and_examples() 
     assert '"amount": "-100.00"' in prompt
     assert '"assigned_category": "Mutuo"' in prompt
     assert '"original_description": "addebito mutuo dicembre"' in prompt
+    assert "Lisa lavora in centro a Bergamo, davanti al PAM" in prompt
+    assert "In famiglia c'e' un cane di nome Linus." in prompt
 
 
 def test_categorize_transactions_with_llm_uses_valid_response() -> None:

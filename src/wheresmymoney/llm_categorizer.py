@@ -12,6 +12,13 @@ from wheresmymoney.runtime_config import RuntimeConfig, RuntimeConfigError
 
 
 FALLBACK_CATEGORY = "Da Verificare"
+HOUSEHOLD_SPENDING_CONTEXT = (
+    "Contesto famiglia utile per orientarti nelle spese:\n"
+    "- Lisa lavora in centro a Bergamo, davanti al PAM, dove va spesso a pranzo.\n"
+    "- Mattia lavora a Dalmine e mangia spesso dal kebabbaro, all'Anonimo o al Lavetti.\n"
+    "- La spesa settimanale di solito viene fatta alla Conad di Curno o a volte a Brembate Sopra.\n"
+    "- In famiglia c'e' un cane di nome Linus.\n"
+)
 LOGGER = logging.getLogger(__name__)
 
 
@@ -195,6 +202,7 @@ def build_categorization_batch_prompt(
         "assigned_category deve essere una delle categorie ammesse.\n"
         "cleaned_description deve essere una breve descrizione leggibile, ma il testo originale non verra' sovrascritto nel foglio.\n"
         "Usa il contesto strutturato disponibile: banca, date, importo, segno e, se presenti, esempi storici simili gia' classificati.\n"
+        f"{HOUSEHOLD_SPENDING_CONTEXT}"
         "Categorie ammesse:\n"
         f"{categories}\n\n"
         "Contesto transazioni (JSON):\n"
